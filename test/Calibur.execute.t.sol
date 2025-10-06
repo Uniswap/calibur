@@ -101,10 +101,11 @@ contract CaliburExecuteTest is TokenHandler, HookHandler, ExecuteFixtures, Deleg
         assertEq(tokenA.balanceOf(address(signerAccount)), 100e18);
         assertEq(tokenB.balanceOf(address(signerAccount)), 100e18);
 
+        uint256 nativeBalanceBefore = address(signerAccount).balance;
+
         vm.prank(address(signerAccount));
         signerAccount.execute(BATCHED_CALL, executionData);
 
-        uint256 nativeBalanceBefore = address(signerAccount).balance;
         assertEq(tokenA.balanceOf(address(receiver)), 1e18);
         assertEq(tokenB.balanceOf(address(receiver)), 1e18);
         // native balance should not change
