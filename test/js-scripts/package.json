@@ -1,5 +1,6 @@
 {
     "name": "js-scripts",
+    "private": true,
     "version": "1.0.0",
     "description": "JavaScript scripts for FFI with Foundry",
     "scripts": {
