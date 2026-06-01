@@ -1,6 +1,7 @@
 [profile.default]
 src = "src"
 out = "out"
+evm_version = "cancun"
 libs = ["lib"]
 optimizer = true
 optimizer_runs = 1000
