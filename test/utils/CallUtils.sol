@@ -178,23 +178,6 @@ library CallUtils {
         signedBatchedCall.executor = executor;
         return signedBatchedCall;
     }
-    /// @dev Create a single execute call for a multicall with a signed batched call
-
-    function encodeSignedExecuteCall(SignedBatchedCall memory signedBatchedCall, bytes memory signature)
-        internal
-        pure
-        returns (bytes memory)
-    {
-        bytes4 executeSelector =
-            bytes4(keccak256("execute((((address,uint256,bytes)[],bool),uint256,bytes32,address,uint256),bytes)"));
-        return abi.encodeWithSelector(executeSelector, signedBatchedCall, signature);
-    }
-
-    /// @dev Create a single execute call for a multicall with a batched call
-    function encodeBatchedExecuteCall(BatchedCall memory batchedCall) internal pure returns (bytes memory) {
-        bytes4 executeSelector = bytes4(keccak256("execute(((address,uint256,bytes)[],bool))"));
-        return abi.encodeWithSelector(executeSelector, batchedCall);
-    }
 
     // HandlerCall operations
 
