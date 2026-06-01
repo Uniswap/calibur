@@ -41,4 +41,4 @@ import {Calibur} from "./Calibur.sol";
 /// @notice Uses custom storage layout according to ERC7201
 /// @custom:storage-location erc7201:Uniswap.Calibur.1.0.0
 /// @dev keccak256(abi.encode(uint256(keccak256("Uniswap.Calibur.1.0.0")) - 1)) & ~bytes32(uint256(0xff))
-contract CaliburEntry is Calibur layout at 0x3b86514c5c56b21f08d8e56ab090292e07c2483b3e667a2a45849dcb71368600 {}
+contract CaliburEntry layout at 0x3b86514c5c56b21f08d8e56ab090292e07c2483b3e667a2a45849dcb71368600 is Calibur {}

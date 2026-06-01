@@ -49,16 +49,14 @@ contract MockERC1271VerifyingContract is EIP712 {
     /// @notice The EIP-712 typestring with PermitSingle as the top level type
     /// @dev This should NOT be used for correct ERC-7739 nested TypedDataSign signatures
     function contentsDescrImplicit() external pure returns (string memory) {
-        return
-        "PermitSingle(PermitDetails details,address spender,uint256 sigDeadline)PermitDetails(address token,uint160 amount,uint48 expiration,uint48 nonce)";
+        return "PermitSingle(PermitDetails details,address spender,uint256 sigDeadline)PermitDetails(address token,uint160 amount,uint48 expiration,uint48 nonce)";
     }
 
     /// @notice Per ERC-7739, use the explicit mode for content descriptor strings since the top level type
     ///         PermitSingle is alphabetically ordered after PermitDetails
     /// @dev return the full contents descriptor string in explicit mode
     function contentsDescrExplicit() external pure returns (string memory) {
-        return
-        "PermitDetails(address token,uint160 amount,uint48 expiration,uint48 nonce)PermitSingle(PermitDetails details,address spender,uint256 sigDeadline)PermitSingle";
+        return "PermitDetails(address token,uint160 amount,uint48 expiration,uint48 nonce)PermitSingle(PermitDetails details,address spender,uint256 sigDeadline)PermitSingle";
     }
 
     /// @notice Apply EIP-7127 hashStruct to the PermitSingle struct

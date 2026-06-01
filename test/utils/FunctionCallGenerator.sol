@@ -79,18 +79,18 @@ abstract contract FunctionCallGenerator is InvariantFixtures {
     {
         if (revertData.length > 0) _state.registerReverted++;
 
-        return CallUtils.initHandlerDefault().withCall(CallUtils.encodeRegisterCall(newKey)).withCallback(
-            abi.encodeWithSelector(IInvariantCallbacks.registerCallback.selector, newKey.toKey())
-        ).withRevertData(revertData);
+        return CallUtils.initHandlerDefault().withCall(CallUtils.encodeRegisterCall(newKey))
+            .withCallback(abi.encodeWithSelector(IInvariantCallbacks.registerCallback.selector, newKey.toKey()))
+            .withRevertData(revertData);
     }
 
     /// @return calldata to revoke a key along with its callback
     function _revokeCall(bytes32 keyHash, bytes memory revertData) internal virtual returns (HandlerCall memory) {
         if (revertData.length > 0) _state.revokeReverted++;
 
-        return CallUtils.initHandlerDefault().withCall(CallUtils.encodeRevokeCall(keyHash)).withCallback(
-            abi.encodeWithSelector(IInvariantCallbacks.revokeCallback.selector, keyHash)
-        ).withRevertData(revertData);
+        return CallUtils.initHandlerDefault().withCall(CallUtils.encodeRevokeCall(keyHash))
+            .withCallback(abi.encodeWithSelector(IInvariantCallbacks.revokeCallback.selector, keyHash))
+            .withRevertData(revertData);
     }
 
     /// @return calldata to update a key along with its callback
@@ -101,9 +101,9 @@ abstract contract FunctionCallGenerator is InvariantFixtures {
     {
         if (revertData.length > 0) _state.updateReverted++;
 
-        return CallUtils.initHandlerDefault().withCall(CallUtils.encodeUpdateCall(keyHash, settings)).withCallback(
-            abi.encodeWithSelector(IInvariantCallbacks.updateCallback.selector, keyHash, settings)
-        ).withRevertData(revertData);
+        return CallUtils.initHandlerDefault().withCall(CallUtils.encodeUpdateCall(keyHash, settings))
+            .withCallback(abi.encodeWithSelector(IInvariantCallbacks.updateCallback.selector, keyHash, settings))
+            .withRevertData(revertData);
     }
 
     /// @return calldata to transfer tokens
@@ -112,9 +112,11 @@ abstract contract FunctionCallGenerator is InvariantFixtures {
         virtual
         returns (HandlerCall memory)
     {
-        return CallUtils.initHandlerDefault().withCall(
-            CallUtils.initDefault().withTo(token).withData(abi.encodeWithSelector(ERC20.transfer.selector, to, amount))
-        );
+        return CallUtils.initHandlerDefault()
+            .withCall(
+                CallUtils.initDefault().withTo(token)
+                    .withData(abi.encodeWithSelector(ERC20.transfer.selector, to, amount))
+            );
     }
 
     /**
