@@ -35,9 +35,7 @@ contract MockHooksLib {
         self.handleAfterVerifySignature(keyHash, digest, signature);
     }
 
-    function handleBeforeExecute(IHook self, bytes32 keyHash, address to, uint256 value, bytes calldata data)
-        external
-    {
+    function handleBeforeExecute(IHook self, bytes32 keyHash, address to, uint256 value, bytes calldata data) external {
         self.handleBeforeExecute(keyHash, to, value, data);
     }
 

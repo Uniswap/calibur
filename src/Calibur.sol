@@ -157,8 +157,8 @@ contract Calibur is
         /// Signature deduction flow as specified by ERC-7739
         // If the signature contains enough data for a TypedDataSign, try the TypedDataSign flow
         bool isValid = _isValidTypedDataSig(key, digest, domainBytes(), signature)
-        // If the signature is not valid as a TypedDataSign, try the NestedPersonalSign flow
-        || _isValidNestedPersonalSig(key, digest, domainSeparator(), signature);
+            // If the signature is not valid as a TypedDataSign, try the NestedPersonalSign flow
+            || _isValidNestedPersonalSig(key, digest, domainSeparator(), signature);
 
         // Early return if the signature is invalid
         if (!isValid) return _1271_INVALID_VALUE;

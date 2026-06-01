@@ -19,7 +19,7 @@ interface IGuardedExecutorHook is IExecutionHook {
     function ANY_TARGET() external view returns (address);
     /// @notice Sentinel value which represents any function selector.
     function ANY_FN_SEL() external view returns (bytes4);
-    
+
     /// @notice Set the canExecute flag for a keyHash, to, and selector.
     /// @dev Note that this hook does not support restricting any `value` sent along with the call
     /// @param keyHash the bytes32 keyHash
