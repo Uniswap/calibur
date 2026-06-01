@@ -9,5 +9,5 @@
   "isValidSignature_rootKey_wrappedSignature___typedDataSign": "17535",
   "isValidSignature_rootKey_wrappedSignature__nestedPersonalSign": "10129",
   "isValidSignature_secp256k1_wrappedSignature___typedDataSign": "38344",
-  "isValidSignature_secp256k1_wrappedSignature__nestedPersonalSign": "12938"
+  "isValidSignature_secp256k1_wrappedSignature__nestedPersonalSign": "30938"
 }
