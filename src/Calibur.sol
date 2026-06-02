@@ -84,15 +84,17 @@ contract Calibur is
         execute(batchedCall);
     }
 
-    /// @dev This function is executeable only by the EntryPoint contract, and is the main pathway for UserOperations to be executed.
-    /// UserOperations can be executed through the execute function, but another method of authorization (ie through a passed in signature) is required.
-    /// userOp.callData is abi.encodeCall(IAccountExecute.executeUserOp.selector, (abi.encode(Call[]), bool))
-    /// Note that this contract is only compatible with Entrypoint versions v0.7.0 and v0.8.0. It is not compatible with v0.6.0, as that version does not support the "executeUserOp" selector.
+    /// @notice This function is executeable only by the EntryPoint contract, and is the main pathway for UserOperations to be executed.
+    /// @dev UserOperations can be executed through the execute function, but another method of authorization (ie through a passed in signature) is required.
+    ///      `userOp.callData` is `abi.encodeCall(IAccountExecute.executeUserOp.selector, (abi.encode(Call[]), bool))`
+    ///      Note that this contract is only compatible with Entrypoint versions v0.7.0 and v0.8.0.
+    ///      It is not compatible with v0.6.0, as that version does not support the "executeUserOp" selector.
     function executeUserOp(PackedUserOperation calldata userOp, bytes32) external onlyEntryPoint {
-        // Parse the keyHash from the signature. This is the keyHash that has been pre-validated as the correct signer over the UserOp data
-        // and must be used to check further on-chain permissions over the call execution.
+        // validateUserOp requires that 64 or 65 byte signatures are validated against the root key.
+        // As long as the Entrypoint calls `validateUserOp` with the signature before calling this function, we can skip the keyHash validation here.
         bytes32 keyHash;
         if (!userOp.signature.isRawSignature()) {
+            // Otherwise, parse the keyHash from the signature and pass it along to verify other permissions over the call execution.
             (keyHash,,) = userOp.signature.decodeWithKeyHashAndHookData();
         }
 
