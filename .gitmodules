@@ -13,9 +13,9 @@
 [submodule "lib/account-abstraction"]
 	path = lib/account-abstraction
 	url = https://github.com/eth-infinitism/account-abstraction
-[submodule "lib/erc20-eth"]
-	path = lib/erc20-eth
-	url = https://github.com/Uniswap/ERC20-eth
 [submodule "lib/permit2"]
 	path = lib/permit2
 	url = https://github.com/Uniswap/permit2
+[submodule "lib/erc20-eth"]
+	path = lib/erc20-eth
+	url = https://github.com/Uniswap/erc20-eth

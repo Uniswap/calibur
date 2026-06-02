@@ -15,7 +15,6 @@ classDiagram
     Calibur --|> ERC7201
     Calibur --|> ERC7739
     Calibur --|> EIP712
-    Calibur --|> Multicall
     Calibur --|> Receiver
     
     ICalibur --|> IKeyManagement
@@ -27,7 +26,6 @@ classDiagram
     ICalibur --|> IERC7201
     ICalibur --|> IERC7914
     ICalibur --|> INonceManager
-    ICalibur --|> IMulticall
     
     EIP712 --|> IERC5267
     ERC4337Account --|> IAccount
