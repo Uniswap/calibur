@@ -88,8 +88,8 @@ contract Calibur is
     ///      Note that this contract is only compatible with Entrypoint versions v0.7.0 and v0.8.0.
     ///      It is not compatible with v0.6.0, as that version does not support the "executeUserOp" selector.
     function executeUserOp(PackedUserOperation calldata userOp, bytes32) external onlyEntryPoint {
-        // validateUserOp requires that 64 or 65 byte signatures are validated against the root key.
-        // As long as the Entrypoint calls `validateUserOp` with the signature before calling this function, we can skip the keyHash validation here.
+        // If no keyHash is provided, we know that `validateUserOp` has validated the raw signature against the root key.
+        // This default behavior is safe as long as the Entrypoint ensures `validateUserOp` is called before this function
         bytes32 keyHash;
         if (!userOp.signature.isRawSignature()) {
             // Otherwise, parse the keyHash from the signature and pass it along to verify other permissions over the call execution.
