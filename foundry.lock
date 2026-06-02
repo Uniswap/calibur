@@ -3,7 +3,7 @@
     "rev": "3c9ef104688649b7ba6ee0c788aa494783ee24f7"
   },
   "lib/erc20-eth": {
-    "rev": "17d7b9cd6bac1ef807ccb9d5766778eed155851f"
+    "rev": "32b494bfed88acffdd86485f4e14b744bc634655"
   },
   "lib/forge-std": {
     "rev": "3b20d60d14b343ee4f908cb8079495c07f5e8981"
