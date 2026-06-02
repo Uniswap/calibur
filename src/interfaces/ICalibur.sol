@@ -9,7 +9,6 @@ import {IERC7821} from "./IERC7821.sol";
 import {IERC7914} from "./IERC7914.sol";
 import {IEIP712} from "./IEIP712.sol";
 import {IKeyManagement} from "./IKeyManagement.sol";
-import {IMulticall} from "./IMulticall.sol";
 import {INonceManager} from "./INonceManager.sol";
 import {BatchedCall} from "../libraries/BatchedCallLib.sol";
 import {SignedBatchedCall} from "../libraries/SignedBatchedCallLib.sol";
@@ -23,7 +22,6 @@ import {SignedBatchedCall} from "../libraries/SignedBatchedCallLib.sol";
 /// ERC-1271 compliant signature verification
 /// ERC-7914 transfer from native
 /// Alternative key management and verification
-/// Multicall
 interface ICalibur is
     IKeyManagement,
     IERC4337Account,
@@ -33,8 +31,7 @@ interface ICalibur is
     IERC5267,
     IERC7201,
     IERC7914,
-    INonceManager,
-    IMulticall
+    INonceManager
 {
     /// @notice Generic error to bubble up errors from batched calls
     /// @param reason The revert data from the inner call

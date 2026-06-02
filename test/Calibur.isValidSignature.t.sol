@@ -265,6 +265,8 @@ contract CaliburIsValidSignatureTest is DelegationHandler, HookHandler, ERC1271H
      * 3. Nested personal sign
      * = valid signature
      */
+    /// forge-config: default.isolate = true
+    /// forge-config: ci.isolate = true
     function test_isValidSignature_secp256k1_wrappedSignature__nestedPersonalSign_isValid_gas() public {
         TestKey memory key = TestKeyManager.withSeed(KeyType.Secp256k1, 0xb0b);
         vm.prank(address(signer));
