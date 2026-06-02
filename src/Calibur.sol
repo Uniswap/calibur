@@ -19,7 +19,6 @@ import {ERC7821} from "./ERC7821.sol";
 import {ERC7914} from "./ERC7914.sol";
 import {ERC7739} from "./ERC7739.sol";
 import {KeyManagement} from "./KeyManagement.sol";
-import {Multicall} from "./Multicall.sol";
 import {NonceManager} from "./NonceManager.sol";
 import {BatchedCallLib, BatchedCall} from "./libraries/BatchedCallLib.sol";
 import {Call, CallLib} from "./libraries/CallLib.sol";
@@ -47,7 +46,6 @@ contract Calibur is
     ERC7201,
     ERC7739,
     EIP712,
-    Multicall,
     Receiver
 {
     using EnumerableSetLib for EnumerableSetLib.Bytes32Set;
