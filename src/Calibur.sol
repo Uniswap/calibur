@@ -111,21 +111,28 @@ contract Calibur is
         returns (uint256 validationData)
     {
         _payEntryPoint(missingAccountFunds);
-        (bytes32 keyHash, bytes calldata signature, bytes calldata hookData) =
-            userOp.signature.decodeWithKeyHashAndHookData();
 
-        /// The userOpHash does not need to be made replay-safe, as the EntryPoint will always call the sender contract of the UserOperation for validation.
-        Key memory key = getKey(keyHash);
-        bool isValid = key.verify(userOpHash, signature);
+        if (userOp.signature.isRawSignature()) {
+            validationData = KeyLib.toRootKey().verify(userOpHash, userOp.signature)
+                ? SIG_VALIDATION_SUCCEEDED
+                : SIG_VALIDATION_FAILED;
+        } else {
+            (bytes32 keyHash, bytes calldata signature, bytes calldata hookData) =
+                userOp.signature.decodeWithKeyHashAndHookData();
 
-        Settings settings = getKeySettings(keyHash);
+            /// The userOpHash does not need to be made replay-safe, as the EntryPoint will always call the sender contract of the UserOperation for validation.
+            Key memory key = getKey(keyHash);
+            bool isValid = key.verify(userOpHash, signature);
 
-        /// validationData is (uint256(validAfter) << (160 + 48)) | (uint256(validUntil) << 160) | (success ? 0 : 1)
-        /// `validAfter` is always 0.
-        validationData =
-            isValid ? uint256(settings.expiration()) << 160 | SIG_VALIDATION_SUCCEEDED : SIG_VALIDATION_FAILED;
+            Settings settings = getKeySettings(keyHash);
 
-        settings.hook().handleAfterValidateUserOp(keyHash, userOp, userOpHash, validationData, hookData);
+            /// validationData is (uint256(validAfter) << (160 + 48)) | (uint256(validUntil) << 160) | (success ? 0 : 1)
+            /// `validAfter` is always 0.
+            validationData =
+                isValid ? uint256(settings.expiration()) << 160 | SIG_VALIDATION_SUCCEEDED : SIG_VALIDATION_FAILED;
+
+            settings.hook().handleAfterValidateUserOp(keyHash, userOp, userOpHash, validationData, hookData);
+        }
     }
 
     /// @inheritdoc ERC1271
