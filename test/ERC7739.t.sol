@@ -16,7 +16,7 @@ import {Permit2Utils} from "./utils/Permit2Utils.sol";
 import {IPermit2} from "../lib/permit2/src/interfaces/IPermit2.sol";
 import {IAllowanceTransfer} from "../lib/permit2/src/interfaces/IAllowanceTransfer.sol";
 import {PermitHash} from "../lib/permit2/src/libraries/PermitHash.sol";
-import {ERC20ETH} from "../lib/erc20-eth/src/ERC20Eth.sol";
+import {ERC20ETH} from "../lib/erc20-eth/src/ERC20ETH.sol";
 
 contract ERC7739Test is DelegationHandler, TokenHandler, ERC1271Handler, FFISignTypedData {
     using TestKeyManager for TestKey;
