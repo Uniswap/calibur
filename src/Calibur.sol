@@ -91,9 +91,11 @@ contract Calibur is
     function executeUserOp(PackedUserOperation calldata userOp, bytes32) external onlyEntryPoint {
         // Parse the keyHash from the signature. This is the keyHash that has been pre-validated as the correct signer over the UserOp data
         // and must be used to check further on-chain permissions over the call execution.
-        (bytes32 keyHash,,) = userOp.signature.decodeWithKeyHashAndHookData();
+        bytes32 keyHash;
+        if (!userOp.signature.isRawSignature()) {
+            (keyHash,,) = userOp.signature.decodeWithKeyHashAndHookData();
+        }
 
-        // The mode is only passed in to signify the EXEC_TYPE of the calls.
         bytes calldata executionData = userOp.callData.removeSelector();
         (BatchedCall memory batchedCall) = abi.decode(executionData, (BatchedCall));
 
