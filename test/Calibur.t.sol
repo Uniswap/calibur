@@ -333,6 +333,54 @@ contract CaliburTest is DelegationHandler, HookHandler {
         assertEq(signerAccount.ENTRY_POINT(), newEntryPoint);
     }
 
+    function test_validateUserOp_rawSignature_withRootKey_succeeds() public {
+        PackedUserOperation memory userOp;
+        bytes32 userOpHash = entryPoint.getUserOpHash(userOp);
+        bytes memory signature = signerTestKey.sign(userOpHash);
+        userOp.signature = signature;
+
+        vm.prank(address(entryPoint));
+        uint256 validationData = signerAccount.validateUserOp(userOp, userOpHash, 0);
+        assertEq(validationData, 0);
+    }
+
+    function test_validateUserOp_rawSignature_withRootKey_wrongDigest_returnsInvalidSignature() public {
+        PackedUserOperation memory userOp;
+        bytes32 userOpHash = entryPoint.getUserOpHash(userOp);
+        bytes32 wrongUserOpHash = keccak256("invalid");
+        bytes memory signature = signerTestKey.sign(wrongUserOpHash);
+        userOp.signature = signature;
+
+        vm.prank(address(entryPoint));
+        uint256 validationData = signerAccount.validateUserOp(userOp, userOpHash, 0);
+        assertEq(validationData, 1);
+    }
+
+    function test_validateUserOp_rawSignature_withNonRootKey_returnsInvalidSignature() public {
+        PackedUserOperation memory userOp;
+        bytes32 userOpHash = entryPoint.getUserOpHash(userOp);
+        TestKey memory p256Key = TestKeyManager.withSeed(KeyType.P256, 1234);
+        bytes memory signature = p256Key.sign(userOpHash);
+        userOp.signature = signature;
+
+        vm.prank(address(entryPoint));
+        uint256 validationData = signerAccount.validateUserOp(userOp, userOpHash, 0);
+        assertEq(validationData, 1);
+    }
+
+    function test_validateUserOp_wrappedSignature_withRootKey_succeeds() public {
+        PackedUserOperation memory userOp;
+        bytes32 userOpHash = entryPoint.getUserOpHash(userOp);
+        bytes memory signature = signerTestKey.sign(userOpHash);
+        // No hook data for root key
+        bytes memory wrappedSignature = abi.encode(KeyLib.ROOT_KEY_HASH, signature, EMPTY_HOOK_DATA);
+        userOp.signature = wrappedSignature;
+
+        vm.prank(address(entryPoint));
+        uint256 validationData = signerAccount.validateUserOp(userOp, userOpHash, 0);
+        assertEq(validationData, 0);
+    }
+
     function test_validateUserOp_validSignature_withExpiration() public {
         TestKey memory p256Key = TestKeyManager.initDefault(KeyType.P256);
 
