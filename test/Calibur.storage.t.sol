@@ -92,7 +92,7 @@ contract CaliburStorageTest is DelegationHandler {
     function test_saltPrefix_slot() public {
         vm.record();
         vm.prank(address(signerAccount));
-        signerAccount.updateSalt(uint96(1));
+        signerAccount.updateSalt();
         (, bytes32[] memory writeSlots) = vm.accesses(address(signerAccount));
         assertEq(writeSlots.length, 1);
         assertEq(writeSlots[0], _addOffset(signerAccount.CUSTOM_STORAGE_ROOT(), SALT_PREFIX_SLOT));
