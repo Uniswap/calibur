@@ -29,6 +29,9 @@ interface IKeyManagement {
     /// @dev Only admin keys can self-call.
     error OnlyAdminCanSelfCall();
 
+    /// @dev The settings specify a hook that has no enabled callback flags or no deployed code.
+    error InvalidHook();
+
     /// @dev Registers the `key`.
     function register(Key memory key) external;
 

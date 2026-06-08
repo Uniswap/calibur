@@ -13,6 +13,9 @@ import {Settings, SettingsLib} from "../src/libraries/SettingsLib.sol";
 import {SettingsBuilder} from "./utils/SettingsBuilder.sol";
 import {Constants} from "./utils/Constants.sol";
 import {BaseAuthorization} from "../src/BaseAuthorization.sol";
+import {IHook} from "../src/interfaces/IHook.sol";
+import {HooksLib} from "../src/libraries/HooksLib.sol";
+import {MockHook} from "./utils/MockHook.sol";
 
 contract CaliburTest is DelegationHandler, HookHandler {
     using KeyLib for Key;
@@ -149,6 +152,54 @@ contract CaliburTest is DelegationHandler, HookHandler {
         keySettings = signerAccount.getKeySettings(keyHash);
         assertEq(keySettings.isAdmin(), true);
 
+        vm.stopPrank();
+    }
+
+    function test_update_revertsWhenHookHasCodeButNoFlags() public {
+        bytes32 keyHash = mockSecp256k1Key.hash();
+        vm.startPrank(address(signerAccount));
+        signerAccount.register(mockSecp256k1Key);
+
+        // noHooks (0xC0..00) has code etched but no flag bits set, so no callback would ever fire
+        vm.expectRevert(IKeyManagement.InvalidHook.selector);
+        signerAccount.update(keyHash, SettingsBuilder.init().fromHook(IHook(address(noHooks))));
+        vm.stopPrank();
+    }
+
+    function test_update_revertsWhenHookHasFlagsButNoCode() public {
+        bytes32 keyHash = mockSecp256k1Key.hash();
+        vm.startPrank(address(signerAccount));
+        signerAccount.register(mockSecp256k1Key);
+
+        // BEFORE_EXECUTE_FLAG (0x08) set but nothing deployed at the address
+        address hookAddr = 0xc000000000000000000000000000000000000008;
+        assertEq(hookAddr.code.length, 0);
+
+        vm.expectRevert(IKeyManagement.InvalidHook.selector);
+        signerAccount.update(keyHash, SettingsBuilder.init().fromHook(IHook(hookAddr)));
+        vm.stopPrank();
+    }
+
+    /// @dev A hook is accepted iff it has both code and at least one flag; vary only the
+    ///      flag-bearing low byte (base 0xC0.. avoids precompiles) with code always present.
+    /// forge-config: default.fuzz.runs = 256
+    function testFuzz_update_hookFlagValidation(uint8 lowByte) public {
+        bytes32 keyHash = mockSecp256k1Key.hash();
+        vm.startPrank(address(signerAccount));
+        signerAccount.register(mockSecp256k1Key);
+
+        address hookAddr = address(uint160(0xC000000000000000000000000000000000000000) | uint160(lowByte));
+        vm.etch(hookAddr, address(new MockHook()).code);
+
+        Settings keySettings = SettingsBuilder.init().fromHook(IHook(hookAddr));
+
+        if (uint160(hookAddr) & HooksLib.ALL_FLAGS == 0) {
+            vm.expectRevert(IKeyManagement.InvalidHook.selector);
+            signerAccount.update(keyHash, keySettings);
+        } else {
+            signerAccount.update(keyHash, keySettings);
+            assertEq(address(signerAccount.getKeySettings(keyHash).hook()), hookAddr);
+        }
         vm.stopPrank();
     }
 
