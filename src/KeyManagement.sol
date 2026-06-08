@@ -22,6 +22,7 @@ abstract contract KeyManagement is IKeyManagement, BaseAuthorization {
     /// @inheritdoc IKeyManagement
     function register(Key memory key) external onlyThis {
         if (key.isRootKey()) revert CannotRegisterRootKey();
+        _checkCanRegister(key);
 
         bytes32 keyHash = key.hash();
         keyStorage[keyHash] = abi.encode(key);
@@ -84,6 +85,10 @@ abstract contract KeyManagement is IKeyManagement, BaseAuthorization {
     function isRegistered(bytes32 keyHash) public view returns (bool) {
         return keyHashes.contains(keyHash);
     }
+
+    /// @notice Hook for additional validation before a key is registered
+    /// @dev Defaults to a no-op; overridden by implementations that reserve certain keys
+    function _checkCanRegister(Key memory key) internal view virtual {}
 
     /// @notice Reverts if the key settings are expired
     function _checkExpiry(Settings settings) internal view {

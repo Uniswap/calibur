@@ -7,6 +7,7 @@ import {Key, KeyType, KeyLib} from "../src/libraries/KeyLib.sol";
 import {IERC7821} from "../src/interfaces/IERC7821.sol";
 import {IKeyManagement} from "../src/interfaces/IKeyManagement.sol";
 import {PackedUserOperation} from "account-abstraction/interfaces/PackedUserOperation.sol";
+import {IEntryPoint} from "account-abstraction/interfaces/IEntryPoint.sol";
 import {IERC4337Account} from "../src/ERC4337Account.sol";
 import {TestKey, TestKeyManager} from "./utils/TestKeyManager.sol";
 import {Settings, SettingsLib} from "../src/libraries/SettingsLib.sol";
@@ -71,6 +72,35 @@ contract CaliburTest is DelegationHandler, HookHandler {
     function test_register_revertsWithUnauthorized() public {
         vm.expectRevert(BaseAuthorization.Unauthorized.selector);
         signerAccount.register(mockSecp256k1Key);
+    }
+
+    function test_register_revertsWhenKeyIsDefaultEntryPoint() public {
+        Key memory entryPointKey = Key(KeyType.Secp256k1, abi.encode(signerAccount.ENTRY_POINT()));
+        vm.prank(address(signerAccount));
+        vm.expectRevert(abi.encodeWithSelector(IKeyManagement.CannotRegisterKey.selector, entryPointKey));
+        signerAccount.register(entryPointKey);
+    }
+
+    function testFuzz_register_revertsWhenKeyIsEntryPoint(address entryPoint) public {
+        // The root key is rejected by a different check, so exclude it here
+        vm.assume(entryPoint != address(signerAccount));
+        vm.startPrank(address(signerAccount));
+        signerAccount.updateEntryPoint(entryPoint);
+
+        // A Secp256k1 key for the configured EntryPoint collides with the caller key it would derive,
+        // so registration must be rejected
+        Key memory entryPointKey = Key(KeyType.Secp256k1, abi.encode(entryPoint));
+        vm.expectRevert(abi.encodeWithSelector(IKeyManagement.CannotRegisterKey.selector, entryPointKey));
+        signerAccount.register(entryPointKey);
+        vm.stopPrank();
+    }
+
+    function test_register_revertsWhenKeyIsSenderCreator() public {
+        address senderCreator = address(IEntryPoint(signerAccount.ENTRY_POINT()).senderCreator());
+        Key memory senderCreatorKey = Key(KeyType.Secp256k1, abi.encode(senderCreator));
+        vm.prank(address(signerAccount));
+        vm.expectRevert(abi.encodeWithSelector(IKeyManagement.CannotRegisterKey.selector, senderCreatorKey));
+        signerAccount.register(senderCreatorKey);
     }
 
     function test_register_expiryUpdated() public {

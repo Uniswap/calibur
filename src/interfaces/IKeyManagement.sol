@@ -26,6 +26,9 @@ interface IKeyManagement {
     /// @dev Cannot register the root key.
     error CannotRegisterRootKey();
 
+    /// @dev Cannot register a key.
+    error CannotRegisterKey(Key key);
+
     /// @dev Only admin keys can self-call.
     error OnlyAdminCanSelfCall();
 

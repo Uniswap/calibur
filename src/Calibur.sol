@@ -5,6 +5,8 @@ import {EnumerableSetLib} from "solady/utils/EnumerableSetLib.sol";
 import {Receiver} from "solady/accounts/Receiver.sol";
 import {P256} from "@openzeppelin/contracts/utils/cryptography/P256.sol";
 import {IAccount} from "account-abstraction/interfaces/IAccount.sol";
+import {IEntryPoint} from "account-abstraction/interfaces/IEntryPoint.sol";
+import {ISenderCreator} from "account-abstraction/interfaces/ISenderCreator.sol";
 import {PackedUserOperation} from "account-abstraction/interfaces/PackedUserOperation.sol";
 import {IERC1271} from "./interfaces/IERC1271.sol";
 import {IERC7821} from "./interfaces/IERC7821.sol";
@@ -180,6 +182,21 @@ contract Calibur is
         settings.hook().handleAfterIsValidSignature(keyHash, digest, hookData);
 
         return _1271_MAGIC_VALUE;
+    }
+
+    /// @notice Prevent registering protected addresses as keys on the account
+    function _checkCanRegister(Key memory key) internal view override {
+        bytes32 keyHash = key.hash();
+        address entryPoint = ENTRY_POINT();
+        if (keyHash == entryPoint.toKeyHash()) revert IKeyManagement.CannotRegisterKey(key);
+
+        // success is not required to be true to prevent bricking of all key registrations if the entryPoint is not set up correctly
+        (bool success, bytes memory output) =
+            entryPoint.staticcall(abi.encodeWithSelector(IEntryPoint.senderCreator.selector));
+        if (success && output.length >= 32) {
+            address senderCreator = abi.decode(output, (address));
+            if (keyHash == senderCreator.toKeyHash()) revert IKeyManagement.CannotRegisterKey(key);
+        }
     }
 
     /// @dev Iterates through calls, reverting according to specified failure mode

@@ -4,8 +4,8 @@
   "execute_native_singleCall": "59831",
   "execute_singleCall": "59522",
   "execute_twoCalls": "95374",
-  "execute_withSignature_P256_singleCall": "373608",
-  "execute_withSignature_executor_singleCall": "96979",
+  "execute_withSignature_P256_singleCall": "379460",
+  "execute_withSignature_executor_singleCall": "96967",
   "execute_withSignature_singleCall": "96715",
   "execute_withSignature_singleCall_native": "97511",
   "execute_withSignature_twoCalls": "134217"
