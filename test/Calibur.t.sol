@@ -74,6 +74,34 @@ contract CaliburTest is DelegationHandler, HookHandler {
         signerAccount.register(mockSecp256k1Key);
     }
 
+    function testFuzz_register_revertsForOversizedSecp256k1Key(address addr, uint8 extra) public {
+        // address(this) decodes to the root key, which is rejected by a separate check
+        vm.assume(addr != address(0) && addr != address(signerAccount) && extra != 0);
+        // Trailing bytes produce a distinct keyHash that still verifies the same signer
+        Key memory aliasKey = Key(KeyType.Secp256k1, abi.encodePacked(abi.encode(addr), new bytes(extra)));
+        vm.prank(address(signerAccount));
+        vm.expectRevert(IKeyManagement.InvalidKey.selector);
+        signerAccount.register(aliasKey);
+    }
+
+    function test_register_revertsForZeroAddressSecp256k1Key() public {
+        Key memory zeroKey = Key(KeyType.Secp256k1, abi.encode(address(0)));
+        vm.prank(address(signerAccount));
+        vm.expectRevert(IKeyManagement.InvalidKey.selector);
+        signerAccount.register(zeroKey);
+    }
+
+    function testFuzz_register_revertsForWrongLengthP256Key(uint256 x, uint256 y, uint8 extra) public {
+        vm.assume(extra != 0);
+        bytes memory publicKey = abi.encodePacked(abi.encode(x, y), new bytes(extra));
+        vm.startPrank(address(signerAccount));
+        vm.expectRevert(IKeyManagement.InvalidKey.selector);
+        signerAccount.register(Key(KeyType.P256, publicKey));
+        vm.expectRevert(IKeyManagement.InvalidKey.selector);
+        signerAccount.register(Key(KeyType.WebAuthnP256, publicKey));
+        vm.stopPrank();
+    }
+
     function test_register_revertsWhenKeyIsDefaultEntryPoint() public {
         Key memory entryPointKey = Key(KeyType.Secp256k1, abi.encode(signerAccount.ENTRY_POINT()));
         vm.prank(address(signerAccount));
@@ -83,7 +111,7 @@ contract CaliburTest is DelegationHandler, HookHandler {
 
     function testFuzz_register_revertsWhenKeyIsEntryPoint(address entryPoint) public {
         // The root key is rejected by a different check, so exclude it here
-        vm.assume(entryPoint != address(signerAccount));
+        vm.assume(entryPoint != address(signerAccount) && entryPoint != address(0));
         vm.startPrank(address(signerAccount));
         signerAccount.updateEntryPoint(entryPoint);
 

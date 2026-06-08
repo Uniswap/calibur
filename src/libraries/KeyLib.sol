@@ -30,6 +30,19 @@ library KeyLib {
         return keccak256(abi.encode(key.keyType, keccak256(key.publicKey)));
     }
 
+    /// @notice Returns whether the key's publicKey is encoded in its expected, minimal form
+    /// @dev Secp256k1 must be abi.encode(address) (32 bytes); P256 and WebAuthnP256 must be
+    ///      abi.encode(uint256 x, uint256 y) (64 bytes).
+    function isValidPublicKey(Key memory key) internal pure returns (bool) {
+        if (key.keyType == KeyType.Secp256k1) {
+            // Must be exactly abi.encode(address): 32 bytes, no dirty upper bits, and non-zero
+            if (key.publicKey.length != 32) return false;
+            uint256 word = abi.decode(key.publicKey, (uint256));
+            return word != 0 && word <= type(uint160).max;
+        }
+        return key.publicKey.length == 64;
+    }
+
     /// @notice Returns whether the keyHash is the root key hash
     function isRootKey(bytes32 keyHash) internal pure returns (bool) {
         return keyHash == ROOT_KEY_HASH;

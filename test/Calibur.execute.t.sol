@@ -157,12 +157,12 @@ contract CaliburExecuteTest is TokenHandler, HookHandler, ExecuteFixtures, Deleg
         assertEq(tokenB.balanceOf(address(receiver)), 0);
     }
 
-    function test_execute_withSignature_addressZero_invalidSignature_reverts() public {
-        TestKey memory addressZeroKey =
-            TestKey({keyType: KeyType.Secp256k1, publicKey: abi.encode(0, 0), privateKey: uint256(0)});
-
+    function test_execute_withSignature_signatureRecoversToAddressZero_reverts() public {
+        // address(0) keys can no longer be registered, so this exercises the verify() guard directly:
+        // a malformed signature that recovers to address(0) must not validate against a registered key.
+        TestKey memory secp256k1Key = TestKeyManager.initDefault(KeyType.Secp256k1);
         vm.prank(address(signerAccount));
-        signerAccount.register(addressZeroKey.toKey());
+        signerAccount.register(secp256k1Key.toKey());
 
         // Transfer the whole balance of tokenB
         uint256 userBalanceTokenB = tokenB.balanceOf(address(signerAccount));
@@ -174,11 +174,10 @@ contract CaliburExecuteTest is TokenHandler, HookHandler, ExecuteFixtures, Deleg
 
         BatchedCall memory batchedCall = CallUtils.initBatchedCall().withCalls(calls).withRevertOnFailure(true);
         SignedBatchedCall memory signedBatchedCall = CallUtils.initSignedBatchedCall().withBatchedCall(batchedCall)
-            .withNonce(nonce).withKeyHash(addressZeroKey.toKeyHash());
+            .withNonce(nonce).withKeyHash(secp256k1Key.toKeyHash());
 
-        // Use a dummy signature that is at least 64 bytes
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(1234, keccak256("invalidDigest"));
-        bytes memory signature = abi.encodePacked(r, s, v);
+        // r = 0 is an invalid ECDSA signature; recovery returns address(0)
+        bytes memory signature = abi.encodePacked(bytes32(0), bytes32(0), uint8(27));
         bytes memory wrappedSignature = abi.encode(signature, EMPTY_HOOK_DATA);
 
         vm.expectRevert(ICalibur.InvalidSignature.selector);
