@@ -17,15 +17,18 @@ abstract contract ERC7914 is IERC7914, BaseAuthorization {
     address public constant ERC20ETH = 0x00000000e20E49e6dCeE6e8283A0C090578F0fb9;
 
     /// @inheritdoc IERC7914
-    /// @dev This does NOT override approvals for the ERC20ETH contract
+    /// @dev Will revert on attempts to approve the ERC20ETH contract
     function approveNative(address spender, uint256 amount) external onlyThis returns (bool) {
+        if (spender == ERC20ETH) revert CannotApproveERC20ETH();
         _nativeAllowance[spender] = amount;
         emit ApproveNative(address(this), spender, amount);
         return true;
     }
 
     /// @inheritdoc IERC7914
+    /// @dev Will revert on attempts to approve the ERC20ETH contract
     function approveNativeTransient(address spender, uint256 amount) external onlyThis returns (bool) {
+        if (spender == ERC20ETH) revert CannotApproveERC20ETH();
         TransientNativeAllowance.set(spender, amount);
         emit ApproveNativeTransient(address(this), spender, amount);
         return true;

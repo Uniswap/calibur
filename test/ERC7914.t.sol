@@ -402,11 +402,13 @@ contract ERC7914Test is DelegationHandler, ERC1271Handler, FFISignTypedData {
         }
     }
 
-    /// @dev The default approval is logic-based and cannot be revoked via approveNative
-    function test_nativeAllowance_erc20ETH_cannotBeRevoked() public {
+    /// @dev approveNative reverts for ERC20ETH, the allowance cannot be modified
+    function test_approveNative_erc20ETH_reverts() public {
         vm.prank(address(signerAccount));
+        vm.expectRevert(IERC7914.CannotApproveERC20ETH.selector);
         signerAccount.approveNative(ERC20ETH_ADDR, 0);
-        // Override wins over stored value
+
+        // Default allowance is unaffected and transfers still work without approval
         assertEq(signerAccount.nativeAllowance(ERC20ETH_ADDR), type(uint256).max);
 
         vm.deal(address(signerAccount), 1 ether);
@@ -414,6 +416,16 @@ contract ERC7914Test is DelegationHandler, ERC1271Handler, FFISignTypedData {
         bool success = signerAccount.transferFromNative(address(signerAccount), recipient, 1 ether);
         assertTrue(success);
         assertEq(recipient.balance, 1 ether);
+    }
+
+    /// @dev approveNativeTransient reverts for ERC20ETH
+    function test_approveNativeTransient_erc20ETH_reverts() public {
+        vm.prank(address(signerAccount));
+        vm.expectRevert(IERC7914.CannotApproveERC20ETH.selector);
+        signerAccount.approveNativeTransient(ERC20ETH_ADDR, type(uint256).max);
+
+        // Transient allowance is unaffected (still defaults to zero)
+        assertEq(signerAccount.transientNativeAllowance(ERC20ETH_ADDR), 0);
     }
 
     /// @dev The ERC20ETH default applies to persistent allowance only, not transient
