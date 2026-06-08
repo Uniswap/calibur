@@ -155,6 +155,38 @@ contract CaliburTest is DelegationHandler, HookHandler {
         vm.stopPrank();
     }
 
+    function testFuzz_update_revertsWhenReservedBitsDirty(uint48 reservedBits, uint40 expiration, bool isAdmin) public {
+        // The upper 6 bytes (bits 208-255) are reserved and must be zero
+        vm.assume(reservedBits != 0);
+        bytes32 keyHash = mockSecp256k1Key.hash();
+        vm.startPrank(address(signerAccount));
+        signerAccount.register(mockSecp256k1Key);
+
+        Settings settings = SettingsBuilder.init().fromExpiration(expiration).fromIsAdmin(isAdmin);
+        // Set bits in the reserved upper bytes on top of an otherwise valid value
+        Settings dirty = Settings.wrap(Settings.unwrap(settings) | (uint256(reservedBits) << 208));
+
+        vm.expectRevert(IKeyManagement.InvalidSettings.selector);
+        signerAccount.update(keyHash, dirty);
+        vm.stopPrank();
+    }
+
+    function testFuzz_update_succeedsWhenReservedBitsUnset(uint40 expiration, bool isAdmin) public {
+        bytes32 keyHash = mockSecp256k1Key.hash();
+        vm.startPrank(address(signerAccount));
+        signerAccount.register(mockSecp256k1Key);
+
+        // Use a valid hook (code + flags) so the update passes hook validation; the focus here is
+        // that clean reserved bits round-trip exactly across the used fields.
+        Settings settings =
+            SettingsBuilder.init().fromExpiration(expiration).fromIsAdmin(isAdmin).fromHook(IHook(address(mockHook)));
+        signerAccount.update(keyHash, settings);
+
+        // Settings with clean reserved bits must round-trip exactly: the check must not touch used fields
+        assertEq(Settings.unwrap(signerAccount.getKeySettings(keyHash)), Settings.unwrap(settings));
+        vm.stopPrank();
+    }
+
     function test_update_revertsWhenHookHasCodeButNoFlags() public {
         bytes32 keyHash = mockSecp256k1Key.hash();
         vm.startPrank(address(signerAccount));

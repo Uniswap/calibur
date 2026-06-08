@@ -29,6 +29,9 @@ interface IKeyManagement {
     /// @dev Only admin keys can self-call.
     error OnlyAdminCanSelfCall();
 
+    /// @dev Thrown when the settings have bits set in the region reserved for future use.
+    error InvalidSettings();
+
     /// @dev The settings specify a hook that has no enabled callback flags or no deployed code.
     error InvalidHook();
 

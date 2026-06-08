@@ -18,6 +18,9 @@ library SettingsLib {
     uint40 constant MASK_5_BYTES = uint40(0xFFFFFFFFFF);
     uint8 constant MASK_1_BYTE = uint8(0xFF);
 
+    /// @notice Mask covering the upper 6 bytes (bits 208-255), which are reserved for future use and definition
+    uint256 constant RESERVED_BITS = uint256(0xFFFFFFFFFFFF) << 208;
+
     Settings constant DEFAULT = Settings.wrap(0);
     // RootKey has the settings: (isAdmin = true, 0 expiration, no hook)
     Settings constant ROOT_KEY_SETTINGS = Settings.wrap(uint256(1) << 200);
