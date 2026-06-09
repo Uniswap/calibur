@@ -11,7 +11,7 @@ ffi = true
 remappings = [
     "webauthn-sol/=lib/webauthn-sol/"
 ]
-additional_compiler_profiles = [{ name = "via_ir", optimizer_runs = 10000, via_ir = true }]
+additional_compiler_profiles = [{ name = "via_ir", optimizer_runs = 1000, via_ir = true }]
 
 compilation_restrictions = [
   { paths = "src/CaliburEntry.sol", via_ir = true },
