@@ -82,6 +82,7 @@ library KeyLib {
             (uint256 x, uint256 y) = abi.decode(key.publicKey, (uint256, uint256));
             // Decode the signature into the WebAuthnAuth struct
             WebAuthn.WebAuthnAuth memory auth = abi.decode(signature, (WebAuthn.WebAuthnAuth));
+            // Calibur does not enforce WebAuthn signatures which require user verification
             isValid = WebAuthn.verify({challenge: abi.encode(_hash), requireUV: false, webAuthnAuth: auth, x: x, y: y});
         } else {
             isValid = false;
