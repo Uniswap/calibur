@@ -23,7 +23,7 @@ abstract contract KeyManagement is IKeyManagement, BaseAuthorization {
     function register(Key memory key) external onlyThis {
         if (key.isRootKey()) revert CannotRegisterRootKey();
         if (!key.isValidPublicKey()) revert InvalidKey();
-        
+
         _checkCanRegister(key);
 
         bytes32 keyHash = key.hash();

@@ -131,4 +131,12 @@ contract KeyLibTest is Test {
         // Try to verify against the original digest
         assertEq(mockKeyLib.verify(testKey.toKey(), digest, signature), false);
     }
+
+    function test_verify_p256_trailingBytes_returnsFalse_fuzz(bytes32 digest, bytes memory trailing) public view {
+        vm.assume(trailing.length != 0);
+        TestKey memory testKey = TestKeyManager.initDefault(KeyType.P256);
+        // An otherwise valid signature with arbitrary trailing bytes appended must be rejected
+        bytes memory signature = abi.encodePacked(testKey.sign(digest), trailing);
+        assertEq(mockKeyLib.verify(testKey.toKey(), digest, signature), false);
+    }
 }

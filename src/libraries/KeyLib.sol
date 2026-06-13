@@ -72,6 +72,8 @@ library KeyLib {
             address result = ECDSA.tryRecoverCalldata(_hash, signature);
             isValid = result == address(0) ? false : result == abi.decode(key.publicKey, (address));
         } else if (key.keyType == KeyType.P256) {
+            // P256 signatures must be exactly (bytes32 r, bytes32 s) with no trailing bytes
+            if (signature.length != 64) return false;
             // Extract x,y from the public key
             (bytes32 x, bytes32 y) = abi.decode(key.publicKey, (bytes32, bytes32));
             // Split signature into r and s values.
