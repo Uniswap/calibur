@@ -37,7 +37,7 @@ abstract contract KeyManagement is IKeyManagement, BaseAuthorization {
     function update(bytes32 keyHash, Settings settings) external onlyThis {
         if (keyHash.isRootKey()) revert CannotUpdateRootKey();
         if (!isRegistered(keyHash)) revert KeyDoesNotExist();
-        // The upper bits are reserved for future use and definition, so they must be unset
+        // Bits above the admin flag (bit 200) are reserved and must be unset
         if (Settings.unwrap(settings) & SettingsLib.RESERVED_BITS != 0) revert InvalidSettings();
 
         // Reject a hook with no enabled callbacks or no deployed code

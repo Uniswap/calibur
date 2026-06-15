@@ -29,8 +29,7 @@ contract SettingsLibTest is Test {
     }
 
     function test_isAdmin_fuzz(uint256 _settings) public pure {
-        uint8 isAdmin = uint8(_settings >> 200);
-        bool _isAdmin = isAdmin == 0 ? false : true;
+        bool _isAdmin = (_settings >> 200) & 1 == 1;
         Settings settings = Settings.wrap(_settings);
         assertEq(settings.isAdmin(), _isAdmin);
     }
@@ -40,8 +39,14 @@ contract SettingsLibTest is Test {
         assertEq(settings.isAdmin(), false);
     }
 
-    function test_isAdmin_returnsTrueDirtyUpperBits() public pure {
-        Settings settings = Settings.wrap(0xFFFFFFFFFFFFE000000000000000000000000000000000000000000000000000);
+    /// @notice isAdmin reads only bit 200, not the full admin byte
+    function test_isAdmin_readsOnlyBit200NotFullByte() public pure {
+        // bits 201-207 set, bit 200 unset (0xFE = 0b11111110): not an admin
+        Settings settings = Settings.wrap(uint256(0xFE) << 200);
+        assertEq(settings.isAdmin(), false);
+
+        // bit 200 set with the rest of the byte dirty (0xFF): still admin
+        settings = Settings.wrap(uint256(0xFF) << 200);
         assertEq(settings.isAdmin(), true);
     }
 

@@ -6,7 +6,7 @@
   "execute_twoCalls": "95464",
   "execute_withSignature_P256_singleCall": "385732",
   "execute_withSignature_executor_singleCall": "97189",
-  "execute_withSignature_singleCall": "96913",
+  "execute_withSignature_singleCall": "96925",
   "execute_withSignature_singleCall_native": "97721",
   "execute_withSignature_twoCalls": "134487"
 }

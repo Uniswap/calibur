@@ -213,16 +213,49 @@ contract CaliburTest is DelegationHandler, HookHandler {
         vm.stopPrank();
     }
 
-    function testFuzz_update_revertsWhenReservedBitsDirty(uint48 reservedBits, uint40 expiration, bool isAdmin) public {
-        // The upper 6 bytes (bits 208-255) are reserved and must be zero
-        vm.assume(reservedBits != 0);
+    function testFuzz_update_revertsWhenReservedBitsDirty(uint56 reservedBits, uint40 expiration, bool isAdmin) public {
+        // Bits 201-255 sit above the admin flag (bit 200) and must be zero
+        uint256 dirtyBits = uint256(reservedBits) << 201;
+        vm.assume(dirtyBits != 0);
         bytes32 keyHash = mockSecp256k1Key.hash();
         vm.startPrank(address(signerAccount));
         signerAccount.register(mockSecp256k1Key);
 
         Settings settings = SettingsBuilder.init().fromExpiration(expiration).fromIsAdmin(isAdmin);
-        // Set bits in the reserved upper bytes on top of an otherwise valid value
-        Settings dirty = Settings.wrap(Settings.unwrap(settings) | (uint256(reservedBits) << 208));
+        // Set reserved bits above the admin flag on top of an otherwise valid value
+        Settings dirty = Settings.wrap(Settings.unwrap(settings) | dirtyBits);
+
+        vm.expectRevert(IKeyManagement.InvalidSettings.selector);
+        signerAccount.update(keyHash, dirty);
+        vm.stopPrank();
+    }
+
+    function test_update_revertsWhen48BitValidUntilSpillsIntoAdmin() public {
+        // A uint48 ERC-4337 validUntil value shifted by 160 occupies bits 160-207. The low 40 bits land in
+        // expiration; the high 8 bits land in the admin byte. type(uint48).max << 160 would otherwise be read
+        // as expiration = type(uint40).max and isAdmin = true. update must reject it.
+        bytes32 keyHash = mockSecp256k1Key.hash();
+        vm.startPrank(address(signerAccount));
+        signerAccount.register(mockSecp256k1Key);
+
+        Settings spilled = Settings.wrap(uint256(type(uint48).max) << 160);
+        assertEq(spilled.isAdmin(), true);
+
+        vm.expectRevert(IKeyManagement.InvalidSettings.selector);
+        signerAccount.update(keyHash, spilled);
+        vm.stopPrank();
+    }
+
+    function testFuzz_update_revertsWhenAdminByteNotZeroOrOne(uint8 adminByte, uint40 expiration) public {
+        // Only bit 200 may be set in the admin byte; any value above 1 spills into the reserved region
+        vm.assume(adminByte > 1);
+        bytes32 keyHash = mockSecp256k1Key.hash();
+        vm.startPrank(address(signerAccount));
+        signerAccount.register(mockSecp256k1Key);
+
+        Settings dirty = Settings.wrap(
+            (Settings.unwrap(SettingsBuilder.init().fromExpiration(expiration))) | (uint256(adminByte) << 200)
+        );
 
         vm.expectRevert(IKeyManagement.InvalidSettings.selector);
         signerAccount.update(keyHash, dirty);
