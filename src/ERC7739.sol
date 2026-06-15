@@ -2,7 +2,7 @@
 pragma solidity ^0.8.23;
 
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
-import {ERC7739Utils} from "./libraries/ERC7739Utils.sol";
+import {ERC7739Utils} from "@openzeppelin/contracts/utils/cryptography/draft-ERC7739Utils.sol";
 import {Key, KeyLib} from "./libraries/KeyLib.sol";
 import {WrappedSignatureLib} from "./libraries/WrappedSignatureLib.sol";
 
@@ -39,7 +39,7 @@ abstract contract ERC7739 {
         bytes calldata wrappedSignature
     ) internal view returns (bool) {
         (bytes calldata signature, bytes32 appSeparator, bytes32 contentsHash, string calldata contentsDescr) =
-            wrappedSignature.decodeAsTypedDataSig();
+            wrappedSignature.decodeTypedDataSig();
 
         if (!_callerHashMatchesReconstructedHash(appSeparator, digest, contentsHash)) return false;
 
@@ -47,8 +47,9 @@ abstract contract ERC7739 {
         // For safety, ERC-7739 recommends to treat the signature as invalid if either the contentsName or contentsType are empty
         if (bytes(contentsName).length == 0 || bytes(contentsType).length == 0) return false;
 
-        bytes32 nestedDigest =
-            contentsHash.toNestedTypedDataSignHash(domainBytes, appSeparator, contentsName, contentsType);
+        bytes32 nestedDigest = MessageHashUtils.toTypedDataHash(
+            appSeparator, ERC7739Utils.typedDataSignStructHash(contentsName, contentsType, contentsHash, domainBytes)
+        );
 
         return key.verify(nestedDigest, signature);
     }
@@ -60,6 +61,8 @@ abstract contract ERC7739 {
         bytes32 domainSeparator,
         bytes calldata signature
     ) internal view returns (bool) {
-        return key.verify(digest.toPersonalSignTypedDataHash(domainSeparator), signature);
+        return key.verify(
+            MessageHashUtils.toTypedDataHash(domainSeparator, ERC7739Utils.personalSignStructHash(digest)), signature
+        );
     }
 }

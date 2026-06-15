@@ -66,8 +66,9 @@ contract ERC7739Test is DelegationHandler, TokenHandler, ERC1271Handler, FFISign
             mockERC7739Utils.decodeContentsDescr(contentsDescrExplicit);
 
         bytes memory signerAccountDomainBytes = IERC5267(address(signerAccount)).toDomainBytes();
-        bytes32 typedDataSignDigest =
-            contentsHash.hashTypedDataSign(signerAccountDomainBytes, appSeparator, contentsName, contentsType);
+        bytes32 typedDataSignDigest = mockERC7739Utils.hashTypedDataSign(
+            contentsHash, signerAccountDomainBytes, appSeparator, contentsName, contentsType
+        );
 
         // Make it clear that the verifying contract is set properly.
         address verifyingContract = address(signerAccount);
@@ -105,8 +106,9 @@ contract ERC7739Test is DelegationHandler, TokenHandler, ERC1271Handler, FFISign
             mockERC7739Utils.decodeContentsDescr(contentsDescrImplicit);
 
         bytes memory signerAccountDomainBytes = IERC5267(address(signerAccount)).toDomainBytes();
-        bytes32 typedDataSignDigest =
-            contentsHash.hashTypedDataSign(signerAccountDomainBytes, appSeparator, contentsName, contentsType);
+        bytes32 typedDataSignDigest = mockERC7739Utils.hashTypedDataSign(
+            contentsHash, signerAccountDomainBytes, appSeparator, contentsName, contentsType
+        );
 
         // Make it clear that the verifying contract is set properly.
         address verifyingContract = address(signerAccount);
@@ -160,8 +162,9 @@ contract ERC7739Test is DelegationHandler, TokenHandler, ERC1271Handler, FFISign
         (string memory contentsName, string memory contentsType) = mockERC7739Utils.decodeContentsDescr(contentsDescr);
 
         bytes memory signerAccountDomainBytes = IERC5267(address(signerAccount)).toDomainBytes();
-        bytes32 typedDataSignDigest =
-            permitHash.hashTypedDataSign(signerAccountDomainBytes, permit2DomainSeparator, contentsName, contentsType);
+        bytes32 typedDataSignDigest = mockERC7739Utils.hashTypedDataSign(
+            permitHash, signerAccountDomainBytes, permit2DomainSeparator, contentsName, contentsType
+        );
 
         // Sign the digest with the test key
         bytes memory signature = testKey.sign(typedDataSignDigest);
@@ -227,8 +230,9 @@ contract ERC7739Test is DelegationHandler, TokenHandler, ERC1271Handler, FFISign
         (string memory contentsName, string memory contentsType) = mockERC7739Utils.decodeContentsDescr(contentsDescr);
 
         bytes memory signerAccountDomainBytes = IERC5267(address(signerAccount)).toDomainBytes();
-        bytes32 typedDataSignDigest =
-            permitHash.hashTypedDataSign(signerAccountDomainBytes, permit2DomainSeparator, contentsName, contentsType);
+        bytes32 typedDataSignDigest = mockERC7739Utils.hashTypedDataSign(
+            permitHash, signerAccountDomainBytes, permit2DomainSeparator, contentsName, contentsType
+        );
 
         // Sign the digest with the test key
         bytes memory signature = testKey.sign(typedDataSignDigest);

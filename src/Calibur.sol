@@ -25,7 +25,6 @@ import {NonceManager} from "./NonceManager.sol";
 import {BatchedCallLib, BatchedCall} from "./libraries/BatchedCallLib.sol";
 import {Call, CallLib} from "./libraries/CallLib.sol";
 import {CalldataDecoder} from "./libraries/CalldataDecoder.sol";
-import {ERC7739Utils} from "./libraries/ERC7739Utils.sol";
 import {HooksLib} from "./libraries/HooksLib.sol";
 import {Key, KeyLib} from "./libraries/KeyLib.sol";
 import {ModeDecoder} from "./libraries/ModeDecoder.sol";
@@ -59,7 +58,6 @@ contract Calibur is
     using CalldataDecoder for bytes;
     using HooksLib for IHook;
     using SettingsLib for Settings;
-    using ERC7739Utils for bytes;
     using WrappedSignatureLib for bytes;
 
     /// @inheritdoc ICalibur
@@ -152,10 +150,15 @@ contract Calibur is
                 // Forces the compiler to optimize for smaller bytecode size.
                 if (uint256(digest) == ~wrappedSignature.length / 0xffff * 0x7739) return 0x77390001;
             }
-            // If the signature is 64 or 65 bytes, it must be validated as an ECDSA signature from the root key
-            // We skip any checks against expiry or hooks because settings are not supported on the root key
+            // If the signature is 64 or 65 bytes, it must be validated against the root key.
+            // We skip any checks against expiry or hooks because settings are not supported on the root key.
+            // Accept either a raw ECDSA signature over `digest` or an ERC-7739 PersonalSign over the account-nested digest.
             else if (wrappedSignature.isRawSignature()) {
-                if (KeyLib.toRootKey().verify(digest, wrappedSignature)) {
+                Key memory rootKey = KeyLib.toRootKey();
+                if (
+                    rootKey.verify(digest, wrappedSignature)
+                        || _isValidNestedPersonalSig(rootKey, digest, domainSeparator(), wrappedSignature)
+                ) {
                     return _1271_MAGIC_VALUE;
                 } else {
                     return _1271_INVALID_VALUE;
