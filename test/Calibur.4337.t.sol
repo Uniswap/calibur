@@ -16,6 +16,7 @@ import {TestKeyManager, TestKey} from "./utils/TestKeyManager.sol";
 import {KeyType} from "../src/libraries/KeyLib.sol";
 import {IAccountExecute} from "account-abstraction/interfaces/IAccountExecute.sol";
 import {IEntryPoint} from "account-abstraction/interfaces/IEntryPoint.sol";
+import {IKeyManagement} from "../src/interfaces/IKeyManagement.sol";
 import {KeyLib} from "../src/libraries/KeyLib.sol";
 import {INonceManager} from "../src/interfaces/INonceManager.sol";
 import {BatchedCall} from "../src/libraries/BatchedCallLib.sol";
@@ -155,5 +156,53 @@ contract Calibur4337Test is ExecuteFixtures, DelegationHandler, TokenHandler, Ho
 
         uint256 tokenBalanceAfter = tokenA.balanceOf(address(receiver));
         assertEq(tokenBalanceAfter, tokenBalanceBefore + 1e18);
+    }
+
+    // A non-admin key cannot drain the account's EntryPoint deposit through the executeUserOp path.
+    // The signature is valid so validateUserOp passes, but the EntryPoint call reverts during execution
+    // and the EntryPoint surfaces it via UserOperationRevertReason.
+    function test_handleOps_nonAdmin_entryPointCall_reverts_withOnlyAdminCanCallEntryPoint() public {
+        TestKey memory secp256k1Key = TestKeyManager.initDefault(KeyType.Secp256k1);
+        // Register key; key is not admin, no settings
+        vm.prank(address(signerAccount));
+        signerAccount.register(secp256k1Key.toKey());
+
+        // Seed an EntryPoint deposit that the attacker would attempt to drain
+        entryPoint.depositTo{value: 1e18}(address(signerAccount));
+        uint256 depositBefore = entryPoint.balanceOf(address(signerAccount));
+
+        Call[] memory calls = CallUtils.initArray();
+        // withdrawTo would drain the account's EntryPoint deposit as a zero-value call
+        calls = calls.push(
+            Call(
+                address(entryPoint), 0, abi.encodeWithSelector(entryPoint.withdrawTo.selector, receiver, depositBefore)
+            )
+        );
+        BatchedCall memory batchedCall = CallUtils.initBatchedCall().withCalls(calls).withRevertOnFailure(true);
+
+        bytes memory callData = abi.encodeWithSelector(IAccountExecute.executeUserOp.selector, batchedCall);
+
+        PackedUserOperation memory userOp =
+            UserOpBuilder.initDefault().withSender(address(signerAccount)).withNonce(0).withCallData(callData);
+
+        bytes32 userOpHash = entryPoint.getUserOpHash(userOp);
+        userOp.withSignature(abi.encode(secp256k1Key.toKeyHash(), secp256k1Key.sign(userOpHash), EMPTY_HOOK_DATA));
+
+        PackedUserOperation[] memory userOps = new PackedUserOperation[](1);
+        userOps[0] = userOp;
+
+        // The EntryPoint catches the execution-phase revert and surfaces it via UserOperationRevertReason
+        vm.expectEmit(true, true, true, true, address(entryPoint));
+        emit IEntryPoint.UserOperationRevertReason(
+            userOpHash,
+            address(signerAccount),
+            0,
+            abi.encodeWithSelector(IKeyManagement.OnlyAdminCanCallEntryPoint.selector)
+        );
+        entryPoint.handleOps(userOps, bundler);
+
+        // The malicious withdrawal never executed, so the attacker's receiver got nothing.
+        // (The account's own deposit only decreases by the bundler gas reimbursement.)
+        assertEq(receiver.balance, 0);
     }
 }

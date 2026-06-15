@@ -1,12 +1,12 @@
 {
   "execute_empty": "23158",
   "execute_invalidMode_reverts": "22928",
-  "execute_native_singleCall": "59879",
-  "execute_singleCall": "59576",
-  "execute_twoCalls": "95464",
-  "execute_withSignature_P256_singleCall": "385732",
-  "execute_withSignature_executor_singleCall": "97189",
-  "execute_withSignature_singleCall": "96925",
-  "execute_withSignature_singleCall_native": "97721",
-  "execute_withSignature_twoCalls": "134487"
+  "execute_native_singleCall": "59912",
+  "execute_singleCall": "59609",
+  "execute_twoCalls": "95530",
+  "execute_withSignature_P256_singleCall": "391587",
+  "execute_withSignature_executor_singleCall": "97222",
+  "execute_withSignature_singleCall": "96958",
+  "execute_withSignature_singleCall_native": "97754",
+  "execute_withSignature_twoCalls": "134553"
 }

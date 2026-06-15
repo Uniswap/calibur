@@ -262,6 +262,48 @@ contract CaliburExecuteTest is TokenHandler, HookHandler, ExecuteFixtures, Deleg
         signerAccount.execute(batchedCall);
     }
 
+    function test_execute_batchedCall_nonAdmin_entryPointCall_reverts_withOnlyAdminCanCallEntryPoint() public {
+        TestKey memory secp256k1Key = TestKeyManager.initDefault(KeyType.Secp256k1);
+        // Register key
+        vm.prank(address(signerAccount));
+        signerAccount.register(secp256k1Key.toKey());
+        // Key is not admin, no settings
+
+        Call[] memory calls = CallUtils.initArray();
+        // withdrawTo drains the account's EntryPoint deposit as a zero-value call
+        calls = calls.push(
+            Call(address(entryPoint), 0, abi.encodeWithSelector(entryPoint.withdrawTo.selector, receiver, 0))
+        );
+        BatchedCall memory batchedCall = CallUtils.initBatchedCall().withCalls(calls).withRevertOnFailure(true);
+
+        address caller = abi.decode(secp256k1Key.publicKey, (address));
+        vm.prank(caller);
+        vm.expectRevert(IKeyManagement.OnlyAdminCanCallEntryPoint.selector);
+        signerAccount.execute(batchedCall);
+    }
+
+    function test_execute_batchedCall_admin_entryPointCall_succeeds() public {
+        TestKey memory secp256k1Key = TestKeyManager.initDefault(KeyType.Secp256k1);
+        vm.prank(address(signerAccount));
+        signerAccount.register(secp256k1Key.toKey());
+        vm.prank(address(signerAccount));
+        signerAccount.update(secp256k1Key.toKeyHash(), SettingsBuilder.init().fromIsAdmin(true));
+
+        Call[] memory calls = CallUtils.initArray();
+        calls = calls.push(
+            Call(
+                address(entryPoint), 1e18, abi.encodeWithSelector(entryPoint.depositTo.selector, address(signerAccount))
+            )
+        );
+        BatchedCall memory batchedCall = CallUtils.initBatchedCall().withCalls(calls).withRevertOnFailure(true);
+
+        address caller = abi.decode(secp256k1Key.publicKey, (address));
+        vm.prank(caller);
+        signerAccount.execute(batchedCall);
+
+        assertEq(entryPoint.balanceOf(address(signerAccount)), 1e18);
+    }
+
     // Execute can contain a self call which registers a new key even if the caller is untrusted as long as the signature is valid
     function test_execute_withSignature_rootSigner_selfCall_succeeds() public {
         TestKey memory p256Key = TestKeyManager.initDefault(KeyType.P256);

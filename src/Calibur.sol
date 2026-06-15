@@ -221,6 +221,10 @@ contract Calibur is
         // To prevent this, we recommend adding a hook which disallows calls by admin keys to the `register` and `update` functions
         if (!settings.isAdmin() && to == address(this)) revert IKeyManagement.OnlyAdminCanSelfCall();
 
+        // Calls to the EntryPoint move account-owned deposit/stake (e.g. withdrawTo drains the account's deposit
+        // as a zero-value call), so they are gated to admin keys like self-calls.
+        if (!settings.isAdmin() && to == ENTRY_POINT()) revert IKeyManagement.OnlyAdminCanCallEntryPoint();
+
         IHook hook = settings.hook();
         bytes memory beforeExecuteData = hook.handleBeforeExecute(keyHash, to, _call.value, _call.data);
 
