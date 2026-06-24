@@ -25,6 +25,7 @@ import {InvariantRevertLib} from "./utils/InvariantRevertLib.sol";
 import {InvariantBlock} from "./utils/InvariantFixtures.sol";
 import {BaseAuthorization} from "../src/BaseAuthorization.sol";
 import {BatchedCall} from "../src/libraries/BatchedCallLib.sol";
+import {IEntryPoint} from "account-abstraction/interfaces/IEntryPoint.sol";
 
 // To avoid stack to deep
 struct SetupParams {
@@ -220,7 +221,7 @@ contract CaliburExecuteInvariantHandler is ExecuteFixtures, FunctionCallGenerato
 
 /// @title CaliburExecuteInvariantTest
 contract CaliburExecuteInvariantTest is TokenHandler, DelegationHandler {
-    using KeyLib for Key;
+    using KeyLib for *;
     using TestKeyManager for TestKey;
     using CallUtils for Call;
     using CallUtils for Call[];
@@ -278,6 +279,12 @@ contract CaliburExecuteInvariantTest is TokenHandler, DelegationHandler {
     /// @notice Verifies that the root key can always register other signing keys
     function invariant_rootKeyCanAlwaysRegisterOtherSigningKeys() public {
         TestKey memory newKey = TestKeyManager.withSeed(KeyType.Secp256k1, vm.randomUint());
+        bytes32 newKeyHash = newKey.toKeyHash();
+        // Assume that the random key is not a protected address
+        vm.assume(
+            newKeyHash != KeyLib.ROOT_KEY_HASH && newKeyHash != signerAccount.ENTRY_POINT().toKeyHash()
+                && newKeyHash != address(IEntryPoint(signerAccount.ENTRY_POINT()).senderCreator()).toKeyHash()
+        );
         vm.prank(address(signerAccount));
         signerAccount.register(newKey.toKey());
         assertEq(signerAccount.getKey(newKey.toKeyHash()).hash(), newKey.toKeyHash());
