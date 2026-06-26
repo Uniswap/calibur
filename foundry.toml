@@ -14,8 +14,7 @@ remappings = [
 additional_compiler_profiles = [{ name = "via_ir", optimizer_runs = 1000, via_ir = true }]
 
 compilation_restrictions = [
-  { paths = "src/CaliburEntry.sol", via_ir = true },
-  { paths = "src/Calibur.sol", via_ir = true },
+  { paths = "src/ERC7739.sol", via_ir = true },
   { paths = "test/ERC7739.t.sol", via_ir = true }
 ]
 
