@@ -6,25 +6,37 @@ import {DelegationHandler} from "./utils/DelegationHandler.sol";
 contract CaliburStorageTest is DelegationHandler {
     /**
      * Calibur storage layout
-     * slots are assigned starting from the custom layout slot and in order of declaration, from left to right
      *
-     * Calibur is IERC7821, ERC1271, EIP712, ERC4337Account, Receiver, KeyManagement, NonceManager, ERC7914, ERC7201 layout at 0x3b86514c5c56b21f08d8e56ab090292e07c2483b3e667a2a45849dcb71368600
+     * Statically-sized state variables are laid out sequentially from the custom storage root,
+     * following Solidity's C3 linearization (most-base contract first), then declaration order
+     * within each contract. The flattened inheritance order that contributes storage is:
+     * ERC4337Account, KeyManagement, NonceManager, ERC7914, EIP712.
      *
-     * 0: uint256 _CACHED_ENTRYPOINT
-     * 1: mapping(bytes32 keyHash => KeyExtraStorage) keyExtraStorage;
-     * 2: mapping(bytes32 keyHash => bytes encodedKey) keyStorage;
-     * 3: EnumerableSetLib.Bytes32Set keyHashes;
-     * 4: mapping(uint256 key => uint256 seq) nonceSequenceNumber
-     * 5: mapping(address => uint256) allowance;
-     * 6: bytes32 _saltPrefix;
+     *
+     * slot 0: uint256 _CACHED_ENTRYPOINT                                       (ERC4337Account)
+     * slot 1: EnumerableSetLib.Bytes32Set keyHashes                            (KeyManagement)
+     * slot 2: mapping(bytes32 keyHash => bytes encodedKey) keyStorage          (KeyManagement)
+     * slot 3: mapping(bytes32 keyHash => Settings settings) keySettings        (KeyManagement)
+     * slot 4: mapping(uint256 key => uint256 seq) nonceSequenceNumber          (NonceManager)
+     * slot 5: mapping(address spender => uint256 allowance) _nativeAllowance   (ERC7914)
+     * slot 6: bool _erc20ETHAllowanceOverridden (offset 0, 1 byte)             (ERC7914)
+     *         uint96 _saltPrefix              (offset 1, 12 bytes) - packed    (EIP712)
      */
     uint256 private constant ENTRY_POINT_SLOT = 0;
-    uint256 private constant KEY_EXTRA_STORAGE_SLOT = 1;
+    uint256 private constant KEY_HASHES_SLOT = 1;
     uint256 private constant KEY_STORAGE_SLOT = 2;
-    uint256 private constant KEY_HASHES_SLOT = 3;
+    uint256 private constant KEY_SETTINGS_SLOT = 3;
     uint256 private constant NONCE_SEQUENCE_NUMBER_SLOT = 4;
     uint256 private constant ALLOWANCE_SLOT = 5;
     uint256 private constant SALT_PREFIX_SLOT = 6;
+    uint256 private constant ERC20ETH_ALLOWANCE_OVERRIDDEN_SLOT = 6;
+
+    /// @dev Byte offsets of the two variables packed into slot 6.
+    uint256 private constant ERC20ETH_ALLOWANCE_OVERRIDDEN_OFFSET = 0;
+    uint256 private constant SALT_PREFIX_OFFSET = 1;
+
+    /// @dev Must match the canonical address hardcoded in ERC7914.ERC20ETH
+    address private constant ERC20ETH_ADDR = 0x00000000e20E49e6dCeE6e8283A0C090578F0fb9;
 
     function setUp() public {
         setUpDelegation();
@@ -90,11 +102,61 @@ contract CaliburStorageTest is DelegationHandler {
     }
 
     function test_saltPrefix_slot() public {
+        bytes32 slot = _addOffset(signerAccount.CUSTOM_STORAGE_ROOT(), SALT_PREFIX_SLOT);
+
         vm.record();
         vm.prank(address(signerAccount));
         signerAccount.updateSalt();
         (, bytes32[] memory writeSlots) = vm.accesses(address(signerAccount));
         assertEq(writeSlots.length, 1);
-        assertEq(writeSlots[0], _addOffset(signerAccount.CUSTOM_STORAGE_ROOT(), SALT_PREFIX_SLOT));
+        assertEq(writeSlots[0], slot);
+
+        // _saltPrefix lives at offset 1 (bytes 1..12). updateSalt increments it from 0 to 1, so the
+        // raw slot value must equal 1 shifted left past the leading offset-0 byte.
+        bytes32 raw = vm.load(address(signerAccount), slot);
+        assertEq(uint256(raw), uint256(1) << (8 * SALT_PREFIX_OFFSET));
+    }
+
+    /// @dev The ERC20ETH allowance override flag packs into the same slot as _saltPrefix
+    function test_erc20ETHAllowanceOverridden_slot() public {
+        bytes32 slot = _addOffset(signerAccount.CUSTOM_STORAGE_ROOT(), ERC20ETH_ALLOWANCE_OVERRIDDEN_SLOT);
+
+        vm.record();
+        vm.prank(address(signerAccount));
+        signerAccount.approveNative(ERC20ETH_ADDR, 1 ether);
+        (, bytes32[] memory writeSlots) = vm.accesses(address(signerAccount));
+
+        bool found;
+        for (uint256 i = 0; i < writeSlots.length; ++i) {
+            if (writeSlots[i] == slot) found = true;
+        }
+        assertTrue(found);
+
+        // _erc20ETHAllowanceOverridden lives at offset 0 (byte 0). With _saltPrefix still 0, the only
+        // bit set in the slot must be the flag's low byte.
+        bytes32 raw = vm.load(address(signerAccount), slot);
+        assertEq(uint256(raw), uint256(1) << (8 * ERC20ETH_ALLOWANCE_OVERRIDDEN_OFFSET));
+    }
+
+    /// @dev _saltPrefix and _erc20ETHAllowanceOverridden share slot 6; writing one must change the other
+    function test_saltPrefix_and_erc20ETHAllowanceOverridden_packed() public {
+        bytes32 slot = _addOffset(signerAccount.CUSTOM_STORAGE_ROOT(), SALT_PREFIX_SLOT);
+        // Both variables must resolve to the same storage slot.
+        assertEq(SALT_PREFIX_SLOT, ERC20ETH_ALLOWANCE_OVERRIDDEN_SLOT);
+
+        vm.startPrank(address(signerAccount));
+        // Bump _saltPrefix (offset 1) to a known non-zero value.
+        signerAccount.updateSalt();
+        signerAccount.updateSalt();
+        signerAccount.updateSalt();
+        // Then set the override flag (offset 0) in the same slot.
+        signerAccount.approveNative(ERC20ETH_ADDR, 1 ether);
+        vm.stopPrank();
+
+        bytes32 raw = vm.load(address(signerAccount), slot);
+        // Override flag preserved in byte 0.
+        assertEq(uint256(raw) & 0xff, 1);
+        // _saltPrefix preserved at offset 1, unaffected by the flag write.
+        assertEq(uint256(raw) >> (8 * SALT_PREFIX_OFFSET), 3);
     }
 }

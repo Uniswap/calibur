@@ -290,20 +290,86 @@ contract ERC7914Test is DelegationHandler, ERC1271Handler, FFISignTypedData {
         }
     }
 
-    /// @dev approveNative reverts for ERC20ETH, the allowance cannot be modified
-    function test_approveNative_erc20ETH_reverts() public {
+    /// @dev approveNative on ERC20ETH overrides the default unlimited allowance
+    function test_approveNative_erc20ETH_overridesDefault() public {
+        vm.expectEmit(true, true, false, true);
+        emit ApproveNative(address(signerAccount), ERC20ETH_ADDR, 1 ether);
         vm.prank(address(signerAccount));
-        vm.expectRevert(IERC7914.CannotApproveERC20ETH.selector);
-        signerAccount.approveNative(ERC20ETH_ADDR, 0);
-
-        // Default allowance is unaffected and transfers still work without approval
-        assertEq(signerAccount.nativeAllowance(ERC20ETH_ADDR), type(uint256).max);
-
-        vm.deal(address(signerAccount), 1 ether);
-        vm.prank(ERC20ETH_ADDR);
-        bool success = signerAccount.transferFromNative(address(signerAccount), recipient, 1 ether);
+        bool success = signerAccount.approveNative(ERC20ETH_ADDR, 1 ether);
         assertTrue(success);
+
+        // The override replaces the default max and is now consumed on transfer
+        assertEq(signerAccount.nativeAllowance(ERC20ETH_ADDR), 1 ether);
+    }
+
+    /// @dev Once overridden, an ERC20ETH allowance is decremented like any other spender
+    function test_transferFromNative_erc20ETH_overriddenAllowance_decrements() public {
+        vm.deal(address(signerAccount), 2 ether);
+        vm.prank(address(signerAccount));
+        signerAccount.approveNative(ERC20ETH_ADDR, 1 ether);
+
+        vm.expectEmit(true, true, false, true);
+        emit NativeAllowanceUpdated(ERC20ETH_ADDR, 0);
+        vm.prank(ERC20ETH_ADDR);
+        signerAccount.transferFromNative(address(signerAccount), recipient, 1 ether);
+
         assertEq(recipient.balance, 1 ether);
+        assertEq(signerAccount.nativeAllowance(ERC20ETH_ADDR), 0);
+
+        // Further pulls revert now that the overridden allowance is exhausted
+        vm.prank(ERC20ETH_ADDR);
+        vm.expectRevert(IERC7914.AllowanceExceeded.selector);
+        signerAccount.transferFromNative(address(signerAccount), recipient, 1 ether);
+    }
+
+    /// @dev Overriding the allowance to 0 revokes ERC20ETH's ability to pull native ETH
+    function test_approveNative_erc20ETH_revoke() public {
+        vm.deal(address(signerAccount), 1 ether);
+
+        vm.prank(address(signerAccount));
+        signerAccount.approveNative(ERC20ETH_ADDR, 0);
+        assertEq(signerAccount.nativeAllowance(ERC20ETH_ADDR), 0);
+
+        vm.prank(ERC20ETH_ADDR);
+        vm.expectRevert(IERC7914.AllowanceExceeded.selector);
+        signerAccount.transferFromNative(address(signerAccount), recipient, 1 ether);
+
+        assertEq(address(signerAccount).balance, 1 ether);
+    }
+
+    /// @dev An overridden ERC20ETH allowance behaves exactly like a normal spender allowance
+    function test_fuzz_approveNative_erc20ETH_override(uint256 balance, uint256 approvedAmount, uint256 transferAmount)
+        public
+    {
+        vm.deal(address(signerAccount), balance);
+        vm.prank(address(signerAccount));
+        signerAccount.approveNative(ERC20ETH_ADDR, approvedAmount);
+        assertEq(signerAccount.nativeAllowance(ERC20ETH_ADDR), approvedAmount);
+
+        uint256 recipientBalanceBefore = recipient.balance;
+        uint256 signerAccountBalanceBefore = address(signerAccount).balance;
+
+        vm.prank(ERC20ETH_ADDR);
+        if (transferAmount > approvedAmount) {
+            vm.expectRevert(IERC7914.AllowanceExceeded.selector);
+        } else if (transferAmount > address(signerAccount).balance) {
+            vm.expectRevert(IERC7914.TransferNativeFailed.selector);
+        }
+        bool success = signerAccount.transferFromNative(address(signerAccount), recipient, transferAmount);
+
+        if (success) {
+            if (approvedAmount < type(uint256).max) {
+                assertEq(signerAccount.nativeAllowance(ERC20ETH_ADDR), approvedAmount - transferAmount);
+            } else {
+                assertEq(signerAccount.nativeAllowance(ERC20ETH_ADDR), approvedAmount);
+            }
+            assertEq(recipient.balance, recipientBalanceBefore + transferAmount);
+            assertEq(address(signerAccount).balance, signerAccountBalanceBefore - transferAmount);
+        } else {
+            assertEq(signerAccount.nativeAllowance(ERC20ETH_ADDR), approvedAmount);
+            assertEq(recipient.balance, recipientBalanceBefore);
+            assertEq(address(signerAccount).balance, signerAccountBalanceBefore);
+        }
     }
 
     function test_fuzz_transferFromNative_erc20ETH(uint256 balance, uint256 transferAmount) public {

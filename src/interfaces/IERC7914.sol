@@ -9,8 +9,6 @@ interface IERC7914 {
     error IncorrectSender();
     /// @notice Thrown when the transfer of native tokens fails
     error TransferNativeFailed();
-    /// @notice Thrown when attempting to approve the ERC20ETH contract
-    error CannotApproveERC20ETH();
 
     /// @notice Emitted when a transfer from native is made
     event TransferFromNative(address indexed from, address indexed to, uint256 value);
