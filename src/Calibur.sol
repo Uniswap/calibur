@@ -128,8 +128,11 @@ contract Calibur is
             (bytes32 keyHash, bytes calldata signature, bytes calldata hookData) =
                 userOp.signature.decodeWithKeyHashAndHookData();
 
-            /// The userOpHash does not need to be made replay-safe, as the EntryPoint will always call the sender contract of the UserOperation for validation.
+            /// Per ERC-4337, return invalid signature rather than reverting if the key is not registered
+            if (!keyHash.isRootKey() && !isRegistered(keyHash)) return SIG_VALIDATION_FAILED;
+
             Key memory key = getKey(keyHash);
+            /// The userOpHash does not need to be made replay-safe, as the EntryPoint will always call the sender contract of the UserOperation for validation.
             bool isValid = key.verify(userOpHash, signature);
 
             Settings settings = getKeySettings(keyHash);

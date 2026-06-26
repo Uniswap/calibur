@@ -576,6 +576,24 @@ contract CaliburTest is DelegationHandler, HookHandler {
         assertEq(validationData, 0);
     }
 
+    /// @dev An unregistered (non-root) key hash must report a signature failure through validationData rather than reverting.
+    function test_validateUserOp_wrappedSignature_withUnregisteredKey_returnsInvalidSignature() public {
+        TestKey memory unregisteredKey = TestKeyManager.withSeed(KeyType.P256, 1234);
+        assertEq(signerAccount.isRegistered(unregisteredKey.toKeyHash()), false);
+
+        PackedUserOperation memory userOp;
+        userOp.sender = address(signerAccount);
+        userOp.initCode = UserOpBuilder.EIP7702_INITCODE_MARKER;
+        bytes32 userOpHash = entryPoint.getUserOpHash(userOp);
+        bytes memory signature = unregisteredKey.sign(userOpHash);
+        bytes memory wrappedSignature = abi.encode(unregisteredKey.toKeyHash(), signature, EMPTY_HOOK_DATA);
+        userOp.signature = wrappedSignature;
+
+        vm.prank(address(entryPoint));
+        uint256 validationData = signerAccount.validateUserOp(userOp, userOpHash, 0);
+        assertEq(validationData, 1);
+    }
+
     function test_validateUserOp_validSignature_withExpiration() public {
         TestKey memory p256Key = TestKeyManager.initDefault(KeyType.P256);
 
