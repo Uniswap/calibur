@@ -9,6 +9,9 @@ import {IAccount} from "account-abstraction/interfaces/IAccount.sol";
 interface IERC4337Account is IAccount {
     /// Thrown when the caller to validateUserOp is not the EntryPoint contract
     error NotEntryPoint();
+    /// Thrown when a validated UserOperation's initCode is missing the EIP-7702 marker, which the
+    /// EntryPoint requires to bind userOpHash to the account's active delegate
+    error InvalidUserOpInitCode();
 
     /// @notice Emitted when the EntryPoint address is updated
     /// @param newEntryPoint The new EntryPoint address

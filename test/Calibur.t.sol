@@ -17,6 +17,7 @@ import {BaseAuthorization} from "../src/BaseAuthorization.sol";
 import {IHook} from "../src/interfaces/IHook.sol";
 import {HooksLib} from "../src/libraries/HooksLib.sol";
 import {MockHook} from "./utils/MockHook.sol";
+import {UserOpBuilder} from "./utils/UserOpBuilder.sol";
 
 contract CaliburTest is DelegationHandler, HookHandler {
     using KeyLib for Key;
@@ -509,6 +510,8 @@ contract CaliburTest is DelegationHandler, HookHandler {
 
     function test_validateUserOp_rawSignature_withRootKey_succeeds() public {
         PackedUserOperation memory userOp;
+        userOp.sender = address(signerAccount);
+        userOp.initCode = UserOpBuilder.EIP7702_INITCODE_MARKER;
         bytes32 userOpHash = entryPoint.getUserOpHash(userOp);
         bytes memory signature = signerTestKey.sign(userOpHash);
         userOp.signature = signature;
@@ -518,8 +521,22 @@ contract CaliburTest is DelegationHandler, HookHandler {
         assertEq(validationData, 0);
     }
 
+    function test_validateUserOp_emptyInitCode_reverts() public {
+        PackedUserOperation memory userOp;
+        userOp.sender = address(signerAccount);
+        // No EIP-7702 marker: userOpHash would not commit to the active delegate, so validation must reject it
+        bytes32 userOpHash = keccak256("digest");
+        userOp.signature = signerTestKey.sign(userOpHash);
+
+        vm.prank(address(entryPoint));
+        vm.expectRevert(IERC4337Account.InvalidUserOpInitCode.selector);
+        signerAccount.validateUserOp(userOp, userOpHash, 0);
+    }
+
     function test_validateUserOp_rawSignature_withRootKey_wrongDigest_returnsInvalidSignature() public {
         PackedUserOperation memory userOp;
+        userOp.sender = address(signerAccount);
+        userOp.initCode = UserOpBuilder.EIP7702_INITCODE_MARKER;
         bytes32 userOpHash = entryPoint.getUserOpHash(userOp);
         bytes32 wrongUserOpHash = keccak256("invalid");
         bytes memory signature = signerTestKey.sign(wrongUserOpHash);
@@ -532,6 +549,8 @@ contract CaliburTest is DelegationHandler, HookHandler {
 
     function test_validateUserOp_rawSignature_withNonRootKey_returnsInvalidSignature() public {
         PackedUserOperation memory userOp;
+        userOp.sender = address(signerAccount);
+        userOp.initCode = UserOpBuilder.EIP7702_INITCODE_MARKER;
         bytes32 userOpHash = entryPoint.getUserOpHash(userOp);
         TestKey memory p256Key = TestKeyManager.withSeed(KeyType.P256, 1234);
         bytes memory signature = p256Key.sign(userOpHash);
@@ -544,6 +563,8 @@ contract CaliburTest is DelegationHandler, HookHandler {
 
     function test_validateUserOp_wrappedSignature_withRootKey_succeeds() public {
         PackedUserOperation memory userOp;
+        userOp.sender = address(signerAccount);
+        userOp.initCode = UserOpBuilder.EIP7702_INITCODE_MARKER;
         bytes32 userOpHash = entryPoint.getUserOpHash(userOp);
         bytes memory signature = signerTestKey.sign(userOpHash);
         // No hook data for root key
@@ -566,6 +587,8 @@ contract CaliburTest is DelegationHandler, HookHandler {
         vm.stopPrank();
 
         PackedUserOperation memory userOp;
+        userOp.sender = address(signerAccount);
+        userOp.initCode = UserOpBuilder.EIP7702_INITCODE_MARKER;
         bytes32 userOpHash = entryPoint.getUserOpHash(userOp);
         bytes memory signature = p256Key.sign(userOpHash);
         bytes memory wrappedSignature = abi.encode(p256Key.toKeyHash(), signature, EMPTY_HOOK_DATA);
@@ -589,6 +612,8 @@ contract CaliburTest is DelegationHandler, HookHandler {
         vm.stopPrank();
 
         PackedUserOperation memory userOp;
+        userOp.sender = address(signerAccount);
+        userOp.initCode = UserOpBuilder.EIP7702_INITCODE_MARKER;
         bytes32 userOpHash = entryPoint.getUserOpHash(userOp);
 
         // Sign with an incorrect private key for the claimed keyHash
@@ -614,6 +639,8 @@ contract CaliburTest is DelegationHandler, HookHandler {
         vm.stopPrank();
 
         PackedUserOperation memory userOp;
+        userOp.sender = address(signerAccount);
+        userOp.initCode = UserOpBuilder.EIP7702_INITCODE_MARKER;
         bytes32 userOpHash = entryPoint.getUserOpHash(userOp);
         bytes memory signature = p256Key.sign(userOpHash);
         bytes memory wrappedSignature = abi.encode(p256Key.toKeyHash(), signature, EMPTY_HOOK_DATA);
@@ -627,6 +654,8 @@ contract CaliburTest is DelegationHandler, HookHandler {
 
     function test_validateUserOp_missingAccountFunds() public {
         PackedUserOperation memory userOp;
+        userOp.sender = address(signerAccount);
+        userOp.initCode = UserOpBuilder.EIP7702_INITCODE_MARKER;
         bytes32 userOpHash = entryPoint.getUserOpHash(userOp);
         uint256 missingAccountFunds = 1e18;
         bytes memory signature = signerTestKey.sign(userOpHash);
@@ -659,6 +688,8 @@ contract CaliburTest is DelegationHandler, HookHandler {
         vm.stopPrank();
 
         PackedUserOperation memory userOp;
+        userOp.sender = address(signerAccount);
+        userOp.initCode = UserOpBuilder.EIP7702_INITCODE_MARKER;
         // Spoofed signature and userOpHash
         bytes memory wrappedSignature = abi.encode(p256Key.toKeyHash(), signature, EMPTY_HOOK_DATA);
         userOp.signature = wrappedSignature;
@@ -708,6 +739,8 @@ contract CaliburTest is DelegationHandler, HookHandler {
     /// forge-config: ci.isolate = true
     function test_validateUserOp_validSignature() public {
         PackedUserOperation memory userOp;
+        userOp.sender = address(signerAccount);
+        userOp.initCode = UserOpBuilder.EIP7702_INITCODE_MARKER;
         bytes32 userOpHash = entryPoint.getUserOpHash(userOp);
         bytes memory signature = signerTestKey.sign(userOpHash);
         userOp.signature = abi.encode(KeyLib.ROOT_KEY_HASH, signature, EMPTY_HOOK_DATA);
@@ -722,6 +755,8 @@ contract CaliburTest is DelegationHandler, HookHandler {
     /// forge-config: ci.isolate = true
     function test_validateUserOp_validSignature_gas() public {
         PackedUserOperation memory userOp;
+        userOp.sender = address(signerAccount);
+        userOp.initCode = UserOpBuilder.EIP7702_INITCODE_MARKER;
         bytes32 userOpHash = entryPoint.getUserOpHash(userOp);
         bytes memory signature = signerTestKey.sign(userOpHash);
         bytes memory wrappedSignature = abi.encode(KeyLib.ROOT_KEY_HASH, signature, EMPTY_HOOK_DATA);
@@ -736,6 +771,8 @@ contract CaliburTest is DelegationHandler, HookHandler {
     /// forge-config: ci.isolate = true
     function test_validateUserOp_missingAccountFunds_gas() public {
         PackedUserOperation memory userOp;
+        userOp.sender = address(signerAccount);
+        userOp.initCode = UserOpBuilder.EIP7702_INITCODE_MARKER;
         bytes32 userOpHash = entryPoint.getUserOpHash(userOp);
         uint256 missingAccountFunds = 1e18;
         bytes memory signature = signerTestKey.sign(userOpHash);
@@ -763,6 +800,8 @@ contract CaliburTest is DelegationHandler, HookHandler {
         vm.stopPrank();
 
         PackedUserOperation memory userOp;
+        userOp.sender = address(signerAccount);
+        userOp.initCode = UserOpBuilder.EIP7702_INITCODE_MARKER;
         // Spoofed signature and userOpHash
         bytes memory wrappedSignature = abi.encode(p256Key.toKeyHash(), signature, EMPTY_HOOK_DATA);
         userOp.signature = wrappedSignature;
@@ -790,6 +829,8 @@ contract CaliburTest is DelegationHandler, HookHandler {
         vm.stopPrank();
 
         PackedUserOperation memory userOp;
+        userOp.sender = address(signerAccount);
+        userOp.initCode = UserOpBuilder.EIP7702_INITCODE_MARKER;
         // Spoofed signature and userOpHash
         bytes memory wrappedSignature = abi.encode(p256Key.toKeyHash(), signature, EMPTY_HOOK_DATA);
         userOp.signature = wrappedSignature;
@@ -808,6 +849,8 @@ contract CaliburTest is DelegationHandler, HookHandler {
     /// forge-config: ci.isolate = true
     function test_validateUserOp_invalidSignature_gas() public {
         PackedUserOperation memory userOp;
+        userOp.sender = address(signerAccount);
+        userOp.initCode = UserOpBuilder.EIP7702_INITCODE_MARKER;
         bytes32 userOpHash = entryPoint.getUserOpHash(userOp);
         // incorrect private key
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(1234, userOpHash);

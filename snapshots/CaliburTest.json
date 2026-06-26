@@ -1,11 +1,11 @@
 {
-  "caliburEntry bytecode size": "21864",
+  "caliburEntry bytecode size": "22000",
   "entrypoint": "2782",
   "register": "192692",
   "revoke": "54525",
-  "validateUserOp_invalidSignature": "33607",
-  "validateUserOp_missingAccountFunds": "64239",
-  "validateUserOp_no_missingAccountFunds": "33601",
-  "validateUserOp_withHook_invalidSignature": "328469",
-  "validateUserOp_withHook_validSignature": "326671"
+  "validateUserOp_invalidSignature": "34292",
+  "validateUserOp_missingAccountFunds": "64909",
+  "validateUserOp_no_missingAccountFunds": "34286",
+  "validateUserOp_withHook_invalidSignature": "329161",
+  "validateUserOp_withHook_validSignature": "327363"
 }

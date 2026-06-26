@@ -8,6 +8,7 @@ import {IAccount} from "account-abstraction/interfaces/IAccount.sol";
 import {IEntryPoint} from "account-abstraction/interfaces/IEntryPoint.sol";
 import {ISenderCreator} from "account-abstraction/interfaces/ISenderCreator.sol";
 import {PackedUserOperation} from "account-abstraction/interfaces/PackedUserOperation.sol";
+import {Eip7702Support} from "account-abstraction/core/Eip7702Support.sol";
 import {IERC1271} from "./interfaces/IERC1271.sol";
 import {IERC7821} from "./interfaces/IERC7821.sol";
 import {IHook} from "./interfaces/IHook.sol";
@@ -112,6 +113,11 @@ contract Calibur is
         onlyEntryPoint
         returns (uint256 validationData)
     {
+        // Require the EIP-7702 initCode marker so the EntryPoint binds userOpHash to the account's active delegate.
+        // Without it, userOpHash does not commit to Calibur as the executing delegate, so an operation signed while
+        // the EOA delegated elsewhere could replay against Calibur after migration.
+        if (!Eip7702Support._isEip7702InitCode(userOp.initCode)) revert InvalidUserOpInitCode();
+
         _payEntryPoint(missingAccountFunds);
 
         if (userOp.signature.isRawSignature()) {

@@ -125,6 +125,35 @@ contract Calibur4337Test is ExecuteFixtures, DelegationHandler, TokenHandler, Ho
         entryPoint.handleOps(userOps, bundler);
     }
 
+    // A UserOperation with empty initCode is rejected: without the EIP-7702 marker the EntryPoint
+    // does not bind userOpHash to the active delegate, so such ops could replay after a delegate change.
+    function test_handleOps_emptyInitCode_reverts() public {
+        Call[] memory calls = CallUtils.initArray();
+        calls = calls.push(buildTransferCall(address(tokenA), address(receiver), 1e18));
+        BatchedCall memory batchedCall = CallUtils.initBatchedCall().withCalls(calls).withRevertOnFailure(true);
+
+        bytes memory callData = abi.encodeWithSelector(IAccountExecute.executeUserOp.selector, batchedCall);
+
+        PackedUserOperation memory userOp = UserOpBuilder.initDefault().withSender(address(signerAccount)).withNonce(0)
+            .withCallData(callData).withInitCode("");
+
+        bytes32 digest = entryPoint.getUserOpHash(userOp);
+        userOp.withSignature(abi.encode(KeyLib.ROOT_KEY_HASH, signerTestKey.sign(digest), EMPTY_HOOK_DATA));
+
+        PackedUserOperation[] memory userOps = new PackedUserOperation[](1);
+        userOps[0] = userOp;
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IEntryPoint.FailedOpWithRevert.selector,
+                0,
+                "AA23 reverted",
+                abi.encodeWithSelector(IERC4337Account.InvalidUserOpInitCode.selector)
+            )
+        );
+        entryPoint.handleOps(userOps, bundler);
+    }
+
     /// forge-config: default.isolate = true
     /// forge-config: ci.isolate = true
     function test_handleOps_single_P256_gas() public {

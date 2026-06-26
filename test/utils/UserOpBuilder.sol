@@ -11,9 +11,21 @@ library UserOpBuilder {
     uint256 constant DEFAULT_PRE_VERIFICATION_GAS = 1_000_000;
     bytes32 constant DEFAULT_GAS_FEES = bytes32(uint256(100) << 128 | uint256(100));
 
+    /// @dev EIP-7702 initCode marker (0x7702 padded to 20 bytes) that the EntryPoint requires to bind
+    /// userOpHash to the account's active delegate
+    bytes constant EIP7702_INITCODE_MARKER = hex"7702000000000000000000000000000000000000";
+
     function initDefault() internal pure returns (PackedUserOperation memory) {
         return PackedUserOperation(
-            address(0), 0, "", "", DEFAULT_ACCOUNT_GAS_LIMITS, DEFAULT_PRE_VERIFICATION_GAS, DEFAULT_GAS_FEES, "", ""
+            address(0),
+            0,
+            EIP7702_INITCODE_MARKER,
+            "",
+            DEFAULT_ACCOUNT_GAS_LIMITS,
+            DEFAULT_PRE_VERIFICATION_GAS,
+            DEFAULT_GAS_FEES,
+            "",
+            ""
         );
     }
 
