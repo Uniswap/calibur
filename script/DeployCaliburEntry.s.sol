@@ -11,7 +11,11 @@ contract DeployCaliburEntry is Script {
     function run() public returns (CaliburEntry entry) {
         vm.startBroadcast();
 
-        entry = new CaliburEntry{salt: 0x0000000000000000000000000000000000000000eca2ad36bee3874a279d0010}();
+        bytes32 initCodeHash = keccak256(type(CaliburEntry).creationCode);
+        console2.logBytes32(initCodeHash);
+
+        // salt 0x8e5c26fd60c5a1cd7b23cbb635c1176880b2eb8b2f88b7fa14cb35057a8d44eb deploys to 0x00000cAbFc76478C1537dd418aB00967cBbE4AE6
+        entry = new CaliburEntry{salt: 0x8e5c26fd60c5a1cd7b23cbb635c1176880b2eb8b2f88b7fa14cb35057a8d44eb}();
         console2.log("CaliburEntry", address(entry));
 
         vm.stopBroadcast();
