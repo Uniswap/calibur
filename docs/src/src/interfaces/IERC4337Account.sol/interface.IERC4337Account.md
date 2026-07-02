@@ -1,12 +1,15 @@
 # IERC4337Account
-[Git Source](https://github.com/Uniswap/minimal-delegation/blob/8189d62a80ed3ac2bd308849641dca52350f024a/src/interfaces/IERC4337Account.sol)
+[Git Source](https://github.com/Uniswap/calibur/blob/249cac5e880831d7b2de4111a5920dbf0d242846/src/interfaces/IERC4337Account.sol)
 
 **Inherits:**
 IAccount
 
+**Title:**
+IERC4337Account Interface
+
 Interface for contracts that support updating the EntryPoint contract
 
-*Extends the IAccount interface from the ERC4337 specification*
+Extends the IAccount interface from the ERC4337 specification
 
 
 ## Functions
@@ -14,7 +17,7 @@ Interface for contracts that support updating the EntryPoint contract
 
 Updates the EntryPoint address
 
-*4337 support is enabled by default, so this must be called with address(0) in order to disable it.*
+4337 support is enabled by default, so this must be called with address(0) in order to disable it.
 
 
 ```solidity

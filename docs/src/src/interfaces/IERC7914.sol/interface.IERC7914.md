@@ -1,5 +1,8 @@
 # IERC7914
-[Git Source](https://github.com/Uniswap/minimal-delegation/blob/8189d62a80ed3ac2bd308849641dca52350f024a/src/interfaces/IERC7914.sol)
+[Git Source](https://github.com/Uniswap/calibur/blob/249cac5e880831d7b2de4111a5920dbf0d242846/src/interfaces/IERC7914.sol)
+
+**Title:**
+IERC7914
 
 
 ## Functions
@@ -12,20 +15,11 @@ Returns the allowance of a spender
 function nativeAllowance(address spender) external view returns (uint256);
 ```
 
-### transientNativeAllowance
-
-Returns the transient allowance of a spender
-
-
-```solidity
-function transientNativeAllowance(address spender) external view returns (uint256);
-```
-
 ### transferFromNative
 
 Transfers native tokens from the caller to a recipient
 
-*Doesn't forward transferFrom requests - the specified `from` address must be address(this)*
+Doesn't forward transferFrom requests - the specified `from` address must be address(this)
 
 
 ```solidity
@@ -39,26 +33,6 @@ Approves a spender to transfer native tokens on behalf of the caller
 
 ```solidity
 function approveNative(address spender, uint256 amount) external returns (bool);
-```
-
-### transferFromNativeTransient
-
-Transfers native tokens from the caller to a recipient with transient storage
-
-*Doesn't forward transferFrom requests - the specified `from` address must be address(this)*
-
-
-```solidity
-function transferFromNativeTransient(address from, address recipient, uint256 amount) external returns (bool);
-```
-
-### approveNativeTransient
-
-Approves a spender to transfer native tokens on behalf of the caller with transient storage
-
-
-```solidity
-function approveNativeTransient(address spender, uint256 amount) external returns (bool);
 ```
 
 ## Events
@@ -76,22 +50,6 @@ Emitted when a native approval is made
 
 ```solidity
 event ApproveNative(address indexed owner, address indexed spender, uint256 value);
-```
-
-### TransferFromNativeTransient
-Emitted when a transfer from native transient is made
-
-
-```solidity
-event TransferFromNativeTransient(address indexed from, address indexed to, uint256 value);
-```
-
-### ApproveNativeTransient
-Emitted when a transient native approval is made
-
-
-```solidity
-event ApproveNativeTransient(address indexed owner, address indexed spender, uint256 value);
 ```
 
 ### NativeAllowanceUpdated

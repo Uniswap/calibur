@@ -1,15 +1,18 @@
 # EntrypointLib
-[Git Source](https://github.com/Uniswap/minimal-delegation/blob/8189d62a80ed3ac2bd308849641dca52350f024a/src/libraries/EntrypointLib.sol)
+[Git Source](https://github.com/Uniswap/calibur/blob/249cac5e880831d7b2de4111a5920dbf0d242846/src/libraries/EntrypointLib.sol)
 
-*This library is used to dirty the most significant bit of the cached entrypoint
-to indicate that the entrypoint has been overriden by the account*
+**Title:**
+EntrypointLib
+
+This library is used to dirty the most significant bit of the cached entrypoint
+to indicate that the entrypoint has been overriden by the account
 
 
 ## State Variables
 ### ENTRY_POINT_OVERRIDDEN
 
 ```solidity
-uint256 internal constant ENTRY_POINT_OVERRIDDEN = 1 << 255;
+uint256 internal constant ENTRY_POINT_OVERRIDDEN = 1 << 255
 ```
 
 

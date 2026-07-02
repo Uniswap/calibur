@@ -1,25 +1,28 @@
 # CallLib
-[Git Source](https://github.com/Uniswap/minimal-delegation/blob/8189d62a80ed3ac2bd308849641dca52350f024a/src/libraries/CallLib.sol)
+[Git Source](https://github.com/Uniswap/calibur/blob/249cac5e880831d7b2de4111a5920dbf0d242846/src/libraries/CallLib.sol)
+
+**Title:**
+CallLib
 
 A library for hashing and encoding calls
 
 
 ## State Variables
 ### CALL_TYPE
-*The type string for the Call struct*
+The type string for the Call struct
 
 
 ```solidity
-bytes internal constant CALL_TYPE = "Call(address to,uint256 value,bytes data)";
+bytes internal constant CALL_TYPE = "Call(address to,uint256 value,bytes data)"
 ```
 
 
 ### CALL_TYPEHASH
-*The typehash for the Call struct*
+The typehash for the Call struct
 
 
 ```solidity
-bytes32 internal constant CALL_TYPEHASH = keccak256(CALL_TYPE);
+bytes32 internal constant CALL_TYPEHASH = keccak256(CALL_TYPE)
 ```
 
 

@@ -1,11 +1,14 @@
 # INonceManager
-[Git Source](https://github.com/Uniswap/minimal-delegation/blob/8189d62a80ed3ac2bd308849641dca52350f024a/src/interfaces/INonceManager.sol)
+[Git Source](https://github.com/Uniswap/calibur/blob/249cac5e880831d7b2de4111a5920dbf0d242846/src/interfaces/INonceManager.sol)
+
+**Title:**
+INonceManager
 
 Interface for managing nonces used to prevent replay attacks
 
-*Each nonce consists of a 192-bit key and 64-bit sequence number
+Each nonce consists of a 192-bit key and 64-bit sequence number
 The key allows multiple independent nonce sequences
-The sequence must be used in order (0, 1, 2, etc) for each key*
+The sequence must be used in order (0, 1, 2, etc) for each key
 
 
 ## Functions
