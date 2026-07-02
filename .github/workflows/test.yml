@@ -29,13 +29,10 @@ jobs:
         run: |
           forge --version
 
-      # TODO: re-enable once forge fmt supports custom storage layoug
-      # https://github.com/foundry-rs/foundry/issues/10244
-      
-      # - name: Run Forge fmt
-      #   run: |
-      #     forge fmt --check
-      #   id: fmt
+      - name: Run Forge fmt
+        run: |
+          forge fmt --check
+        id: fmt
 
       - name: Run Forge build
         run: |

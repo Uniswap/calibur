@@ -2,7 +2,6 @@
 pragma solidity ^0.8.23;
 
 import {Test} from "forge-std/Test.sol";
-import {ERC7739Utils} from "../../src/libraries/ERC7739Utils.sol";
 import {MockERC7739Utils} from "../utils/MockERC7739Utils.sol";
 
 /// @title ERC7739UtilsTest
@@ -104,5 +103,34 @@ contract ERC7739UtilsTest is Test {
         (contentsName, contentsType) = mockERC7739Utils.decodeContentsDescr(contentsDescr);
         assertEq(contentsName, "");
         assertEq(contentsType, "");
+    }
+
+    /// @notice The trailing uint16 may claim a `contentsDescr` longer than the data provided.
+    /// `decodeTypedDataSig` must return empty values in that case rather than reverting or reading OOB.
+    function test_decodeTypedDataSig_returnsEmpty_ifContentsDescrLengthOverflowsData() public view {
+        // Sanity anchor: a well-formed blob decodes to its non-empty components, so the empty
+        // result below is meaningful (not a vacuously-passing passthrough).
+        bytes memory signature = new bytes(65);
+        bytes32 appSeparator = keccak256("app");
+        bytes32 contentsHash = keccak256("contents");
+        string memory contentsDescr = "SomeType()";
+        bytes memory validEncoded =
+            abi.encodePacked(signature, appSeparator, contentsHash, contentsDescr, uint16(bytes(contentsDescr).length));
+        (bytes memory decodedSig, bytes32 decodedSep, bytes32 decodedHash, string memory decodedDescr) =
+            mockERC7739Utils.decodeTypedDataSig(validEncoded);
+        assertEq(decodedSig, signature);
+        assertEq(decodedSep, appSeparator);
+        assertEq(decodedHash, contentsHash);
+        assertEq(decodedDescr, contentsDescr);
+
+        // 66 bytes total (64-byte body + uint16 length prefix) but the prefix claims a 1-byte
+        // contentsDescr, so 66 < 66 + 1 and the declared length overflows the available data.
+        bytes memory overflowEncoded = abi.encodePacked(new bytes(64), uint16(1));
+        (bytes memory emptySig, bytes32 emptySep, bytes32 emptyHash, string memory emptyDescr) =
+            mockERC7739Utils.decodeTypedDataSig(overflowEncoded);
+        assertEq(emptySig.length, 0);
+        assertEq(emptySep, bytes32(0));
+        assertEq(emptyHash, bytes32(0));
+        assertEq(bytes(emptyDescr).length, 0);
     }
 }

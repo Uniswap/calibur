@@ -39,8 +39,9 @@ contract CaliburIsValidSignatureTest is DelegationHandler, HookHandler, ERC1271H
         bytes memory signerAccountDomainBytes = IERC5267(address(signerAccount)).toDomainBytes();
         (bytes32 appDomainSeparator, string memory contentsDescr, bytes32 contentsHash) = getERC1271Fixtures();
         (string memory contentsName, string memory contentsType) = mockERC7739Utils.decodeContentsDescr(contentsDescr);
-        TEST_TYPED_DATA_SIGN_DIGEST =
-            contentsHash.hashTypedDataSign(signerAccountDomainBytes, appDomainSeparator, contentsName, contentsType);
+        TEST_TYPED_DATA_SIGN_DIGEST = mockERC7739Utils.hashTypedDataSign(
+            contentsHash, signerAccountDomainBytes, appDomainSeparator, contentsName, contentsType
+        );
     }
 
     /**
@@ -101,8 +102,9 @@ contract CaliburIsValidSignatureTest is DelegationHandler, HookHandler, ERC1271H
     function test_isValidSignature_rootKey_wrappedSignature___typedDataSign_isValid_gas() public {
         bytes memory signature = signerTestKey.sign(TEST_TYPED_DATA_SIGN_DIGEST);
         (bytes32 appDomainSeparator, string memory contentsDescr, bytes32 contentsHash) = getERC1271Fixtures();
-        bytes memory typedDataSignSignature =
-            TypedDataSignBuilder.buildTypedDataSignSignature(signature, appDomainSeparator, contentsHash, contentsDescr);
+        bytes memory typedDataSignSignature = TypedDataSignBuilder.buildTypedDataSignSignature(
+            signature, appDomainSeparator, contentsHash, contentsDescr
+        );
         bytes memory wrappedSignature = abi.encode(KeyLib.ROOT_KEY_HASH, typedDataSignSignature, EMPTY_HOOK_DATA);
         // ensure the call returns the ERC1271 magic value
         bytes32 digest = mockERC1271VerifyingContract.hashTypedDataV4(contentsHash);
@@ -127,8 +129,9 @@ contract CaliburIsValidSignatureTest is DelegationHandler, HookHandler, ERC1271H
 
         bytes memory signature = key.sign(TEST_TYPED_DATA_SIGN_DIGEST);
         (bytes32 appDomainSeparator, string memory contentsDescr, bytes32 contentsHash) = getERC1271Fixtures();
-        bytes memory typedDataSignSignature =
-            TypedDataSignBuilder.buildTypedDataSignSignature(signature, appDomainSeparator, contentsHash, contentsDescr);
+        bytes memory typedDataSignSignature = TypedDataSignBuilder.buildTypedDataSignSignature(
+            signature, appDomainSeparator, contentsHash, contentsDescr
+        );
         bytes memory wrappedSignature = abi.encode(key.toKeyHash(), typedDataSignSignature, EMPTY_HOOK_DATA);
         bytes32 digest = mockERC1271VerifyingContract.hashTypedDataV4(contentsHash);
         vm.prank(address(mockERC1271VerifyingContract));
@@ -152,8 +155,9 @@ contract CaliburIsValidSignatureTest is DelegationHandler, HookHandler, ERC1271H
 
         (bytes32 appDomainSeparator, string memory contentsDescr, bytes32 contentsHash) = getERC1271Fixtures();
         bytes memory signature = p256Key.sign(TEST_TYPED_DATA_SIGN_DIGEST);
-        bytes memory typedDataSignSignature =
-            TypedDataSignBuilder.buildTypedDataSignSignature(signature, appDomainSeparator, contentsHash, contentsDescr);
+        bytes memory typedDataSignSignature = TypedDataSignBuilder.buildTypedDataSignSignature(
+            signature, appDomainSeparator, contentsHash, contentsDescr
+        );
         bytes memory wrappedSignature = abi.encode(p256Key.toKeyHash(), typedDataSignSignature, EMPTY_HOOK_DATA);
 
         // Digest is what is calculated by the ERC1271 contract which hashes its domain separator to the contents hash
@@ -177,8 +181,9 @@ contract CaliburIsValidSignatureTest is DelegationHandler, HookHandler, ERC1271H
 
         (bytes32 appDomainSeparator, string memory contentsDescr, bytes32 contentsHash) = getERC1271Fixtures();
         bytes memory signature = webAuthnP256Key.sign(TEST_TYPED_DATA_SIGN_DIGEST);
-        bytes memory typedDataSignSignature =
-            TypedDataSignBuilder.buildTypedDataSignSignature(signature, appDomainSeparator, contentsHash, contentsDescr);
+        bytes memory typedDataSignSignature = TypedDataSignBuilder.buildTypedDataSignSignature(
+            signature, appDomainSeparator, contentsHash, contentsDescr
+        );
         bytes memory wrappedSignature = abi.encode(webAuthnP256Key.toKeyHash(), typedDataSignSignature, EMPTY_HOOK_DATA);
 
         vm.prank(address(signer));
@@ -210,8 +215,9 @@ contract CaliburIsValidSignatureTest is DelegationHandler, HookHandler, ERC1271H
 
         bytes memory signature = p256Key.sign(TEST_TYPED_DATA_SIGN_DIGEST);
         (bytes32 appDomainSeparator, string memory contentsDescr, bytes32 contentsHash) = getERC1271Fixtures();
-        bytes memory typedDataSignSignature =
-            TypedDataSignBuilder.buildTypedDataSignSignature(signature, appDomainSeparator, contentsHash, contentsDescr);
+        bytes memory typedDataSignSignature = TypedDataSignBuilder.buildTypedDataSignSignature(
+            signature, appDomainSeparator, contentsHash, contentsDescr
+        );
         bytes memory wrappedSignature = abi.encode(keyHash, typedDataSignSignature, EMPTY_HOOK_DATA);
 
         // Built by the ERC1271 contract which hashes its domain separator to the contents hash
@@ -254,12 +260,60 @@ contract CaliburIsValidSignatureTest is DelegationHandler, HookHandler, ERC1271H
     }
 
     /**
+     * Scenario: Root key, standard unwrapped ERC-7739 PersonalSign
+     * 1. Raw 65-byte signature with NO keyHash wrapper
+     * 2. Not a valid raw ECDSA signature over `digest`
+     * 3. Valid nested personal sign over the account-nested digest
+     * = valid signature
+     */
+    function test_isValidSignature_rootKey_rawSignature__unwrappedNestedPersonalSign_isValid() public view {
+        string memory message = "test";
+        bytes32 messageHash = MessageHashUtils.toEthSignedMessageHash(bytes(message));
+        bytes32 signerAccountDomainSeparator = signerAccount.domainSeparator();
+        bytes32 wrappedPersonalSignDigest =
+            TypedDataSignBuilder.hashWrappedPersonalSign(messageHash, signerAccountDomainSeparator);
+
+        // A raw 65-byte signature over the nested digest (no abi.encode(keyHash, sig, hookData) wrapper)
+        bytes memory signature = signerTestKey.sign(wrappedPersonalSignDigest);
+        assertEq(signature.length, 65);
+
+        bytes4 result = signerAccount.isValidSignature(messageHash, signature);
+        assertEq(result, _1271_MAGIC_VALUE);
+    }
+
+    /**
+     * Scenario: Non-root key attempts an unwrapped ERC-7739 PersonalSign
+     * @dev A raw 64/65-byte signature carries no keyHash, so it can only resolve to the root key.
+     * = invalid signer
+     */
+    function test_isValidSignature_secp256k1_rawSignature__unwrappedNestedPersonalSign_invalidSigner() public {
+        TestKey memory key = TestKeyManager.withSeed(KeyType.Secp256k1, 0xb0b);
+        vm.prank(address(signer));
+        signerAccount.register(key.toKey());
+
+        string memory message = "test";
+        bytes32 messageHash = MessageHashUtils.toEthSignedMessageHash(bytes(message));
+        bytes32 signerAccountDomainSeparator = signerAccount.domainSeparator();
+        bytes32 wrappedPersonalSignDigest =
+            TypedDataSignBuilder.hashWrappedPersonalSign(messageHash, signerAccountDomainSeparator);
+
+        // Correctly-formed nested personal sign, but signed by a registered NON-root key and submitted unwrapped
+        bytes memory signature = key.sign(wrappedPersonalSignDigest);
+        assertEq(signature.length, 65);
+
+        bytes4 result = signerAccount.isValidSignature(messageHash, signature);
+        assertEq(result, _1271_INVALID_VALUE);
+    }
+
+    /**
      * Scenario: SECP256K1 key
      * 1. Not raw signature
      * 2. Not typed data sign
      * 3. Nested personal sign
      * = valid signature
      */
+    /// forge-config: default.isolate = true
+    /// forge-config: ci.isolate = true
     function test_isValidSignature_secp256k1_wrappedSignature__nestedPersonalSign_isValid_gas() public {
         TestKey memory key = TestKeyManager.withSeed(KeyType.Secp256k1, 0xb0b);
         vm.prank(address(signer));
@@ -347,8 +401,9 @@ contract CaliburIsValidSignatureTest is DelegationHandler, HookHandler, ERC1271H
         TestKey memory key = TestKeyManager.withSeed(KeyType.Secp256k1, 0xb0b);
         bytes memory signature = key.sign(TEST_TYPED_DATA_SIGN_DIGEST);
         (bytes32 appDomainSeparator, string memory contentsDescr, bytes32 contentsHash) = getERC1271Fixtures();
-        bytes memory typedDataSignSignature =
-            TypedDataSignBuilder.buildTypedDataSignSignature(signature, appDomainSeparator, contentsHash, contentsDescr);
+        bytes memory typedDataSignSignature = TypedDataSignBuilder.buildTypedDataSignSignature(
+            signature, appDomainSeparator, contentsHash, contentsDescr
+        );
         bytes memory wrappedSignature = abi.encode(key.toKeyHash(), typedDataSignSignature, EMPTY_HOOK_DATA);
 
         vm.warp(100);
@@ -369,8 +424,9 @@ contract CaliburIsValidSignatureTest is DelegationHandler, HookHandler, ERC1271H
         TestKey memory p256Key = TestKeyManager.initDefault(KeyType.P256);
         bytes memory signature = p256Key.sign(TEST_TYPED_DATA_SIGN_DIGEST);
         (bytes32 appDomainSeparator, string memory contentsDescr, bytes32 contentsHash) = getERC1271Fixtures();
-        bytes memory typedDataSignSignature =
-            TypedDataSignBuilder.buildTypedDataSignSignature(signature, appDomainSeparator, contentsHash, contentsDescr);
+        bytes memory typedDataSignSignature = TypedDataSignBuilder.buildTypedDataSignSignature(
+            signature, appDomainSeparator, contentsHash, contentsDescr
+        );
         bytes memory wrappedSignature = abi.encode(p256Key.toKeyHash(), typedDataSignSignature, EMPTY_HOOK_DATA);
 
         vm.warp(100);
@@ -391,8 +447,9 @@ contract CaliburIsValidSignatureTest is DelegationHandler, HookHandler, ERC1271H
         TestKey memory webAuthnP256Key = TestKeyManager.initDefault(KeyType.WebAuthnP256);
         bytes memory signature = webAuthnP256Key.sign(TEST_TYPED_DATA_SIGN_DIGEST);
         (bytes32 appDomainSeparator, string memory contentsDescr, bytes32 contentsHash) = getERC1271Fixtures();
-        bytes memory typedDataSignSignature =
-            TypedDataSignBuilder.buildTypedDataSignSignature(signature, appDomainSeparator, contentsHash, contentsDescr);
+        bytes memory typedDataSignSignature = TypedDataSignBuilder.buildTypedDataSignSignature(
+            signature, appDomainSeparator, contentsHash, contentsDescr
+        );
         bytes memory wrappedSignature = abi.encode(webAuthnP256Key.toKeyHash(), typedDataSignSignature, EMPTY_HOOK_DATA);
 
         vm.warp(100);
@@ -466,8 +523,9 @@ contract CaliburIsValidSignatureTest is DelegationHandler, HookHandler, ERC1271H
 
         bytes memory signature = webAuthnP256Key.sign(TEST_TYPED_DATA_SIGN_DIGEST);
         (bytes32 appDomainSeparator, string memory contentsDescr, bytes32 contentsHash) = getERC1271Fixtures();
-        bytes memory typedDataSignSignature =
-            TypedDataSignBuilder.buildTypedDataSignSignature(signature, appDomainSeparator, contentsHash, contentsDescr);
+        bytes memory typedDataSignSignature = TypedDataSignBuilder.buildTypedDataSignSignature(
+            signature, appDomainSeparator, contentsHash, contentsDescr
+        );
         // Intentionally don't wrap the signature with the key hash.
         bytes memory wrappedSignature = abi.encode(typedDataSignSignature, EMPTY_HOOK_DATA);
 
@@ -497,11 +555,38 @@ contract CaliburIsValidSignatureTest is DelegationHandler, HookHandler, ERC1271H
         // This is unsafe to sign because `digest` is not nested within a TypedDataSign
         bytes memory signature = signerTestKey.sign(digest);
         // Still build the signature as expected to pass in memory abi decoding
-        bytes memory typedDataSignSignature =
-            TypedDataSignBuilder.buildTypedDataSignSignature(signature, appDomainSeparator, contentsHash, contentsDescr);
+        bytes memory typedDataSignSignature = TypedDataSignBuilder.buildTypedDataSignSignature(
+            signature, appDomainSeparator, contentsHash, contentsDescr
+        );
         bytes memory wrappedSignature = abi.encode(KeyLib.ROOT_KEY_HASH, typedDataSignSignature, EMPTY_HOOK_DATA);
 
         // ensure the call returns the ERC1271 invalid magic value
+        vm.prank(address(mockERC1271VerifyingContract));
+        assertEq(signerAccount.isValidSignature(digest, wrappedSignature), _1271_INVALID_VALUE);
+    }
+
+    /**
+     * Scenario: Root key sent a TypedDataSign with a valid signature but a malformed contentsDescr
+     * @dev The appSeparator/contentsHash correctly reconstruct the digest (passing the caller-hash check),
+     *      and the inner signature is valid over the real nested digest, but the descriptor has no parentheses
+     *      so `decodeContentsDescr` returns empty and `_isValidTypedDataSig` rejects it.
+     * = invalid signer
+     */
+    function test_isValidSignature_rootKey_wrappedSignature___typedDataSign_invalidContentsDescr_invalidSigner()
+        public
+    {
+        (bytes32 appDomainSeparator,, bytes32 contentsHash) = getERC1271Fixtures();
+        bytes32 digest = mockERC1271VerifyingContract.hashTypedDataV4(contentsHash);
+
+        // A valid signature over the correctly-nested digest used by the happy-path test
+        bytes memory signature = signerTestKey.sign(TEST_TYPED_DATA_SIGN_DIGEST);
+        // ...but wrap it with an invalid descriptor (no parentheses) which decodes to an empty contentsName/Type
+        string memory invalidContentsDescr = "PermitSingle";
+        bytes memory typedDataSignSignature = TypedDataSignBuilder.buildTypedDataSignSignature(
+            signature, appDomainSeparator, contentsHash, invalidContentsDescr
+        );
+        bytes memory wrappedSignature = abi.encode(KeyLib.ROOT_KEY_HASH, typedDataSignSignature, EMPTY_HOOK_DATA);
+
         vm.prank(address(mockERC1271VerifyingContract));
         assertEq(signerAccount.isValidSignature(digest, wrappedSignature), _1271_INVALID_VALUE);
     }
@@ -526,8 +611,9 @@ contract CaliburIsValidSignatureTest is DelegationHandler, HookHandler, ERC1271H
         // This is unsafe to sign because `digest` is not nested within a TypedDataSign
         bytes memory signature = key.sign(digest);
         // Still build the signature as expected to pass in memory abi decoding
-        bytes memory typedDataSignSignature =
-            TypedDataSignBuilder.buildTypedDataSignSignature(signature, appDomainSeparator, contentsHash, contentsDescr);
+        bytes memory typedDataSignSignature = TypedDataSignBuilder.buildTypedDataSignSignature(
+            signature, appDomainSeparator, contentsHash, contentsDescr
+        );
         bytes memory wrappedSignature = abi.encode(key.toKeyHash(), typedDataSignSignature, EMPTY_HOOK_DATA);
 
         // ensure the call returns the ERC1271 invalid magic value
@@ -553,8 +639,9 @@ contract CaliburIsValidSignatureTest is DelegationHandler, HookHandler, ERC1271H
         // This is unsafe to sign because `digest` is not nested within a TypedDataSign
         bytes memory signature = p256Key.sign(digest);
         // Still build the signature as expected to pass in memory abi decoding
-        bytes memory typedDataSignSignature =
-            TypedDataSignBuilder.buildTypedDataSignSignature(signature, appDomainSeparator, contentsHash, contentsDescr);
+        bytes memory typedDataSignSignature = TypedDataSignBuilder.buildTypedDataSignSignature(
+            signature, appDomainSeparator, contentsHash, contentsDescr
+        );
         bytes memory wrappedSignature = abi.encode(p256Key.toKeyHash(), typedDataSignSignature, EMPTY_HOOK_DATA);
 
         // ensure the call returns the ERC1271 invalid magic value
@@ -578,8 +665,9 @@ contract CaliburIsValidSignatureTest is DelegationHandler, HookHandler, ERC1271H
         (bytes32 r, bytes32 s) = vm.signP256(p256Key.privateKey, TEST_TYPED_DATA_SIGN_DIGEST);
         bytes memory signature = abi.encodePacked(r, s);
         (bytes32 appDomainSeparator, string memory contentsDescr, bytes32 contentsHash) = getERC1271Fixtures();
-        bytes memory typedDataSignSignature =
-            TypedDataSignBuilder.buildTypedDataSignSignature(signature, appDomainSeparator, contentsHash, contentsDescr);
+        bytes memory typedDataSignSignature = TypedDataSignBuilder.buildTypedDataSignSignature(
+            signature, appDomainSeparator, contentsHash, contentsDescr
+        );
         bytes memory wrappedSignature = abi.encode(p256Key.toKeyHash(), typedDataSignSignature, EMPTY_HOOK_DATA);
 
         // Built by the ERC1271 contract which hashes its domain separator to the contents hash
@@ -591,10 +679,9 @@ contract CaliburIsValidSignatureTest is DelegationHandler, HookHandler, ERC1271H
     }
 
     /**
-     * Scenario: WebAuthn key sent a TypedDataSign signature but did not sign the correct digest
-     * We expect the revert to happen in KeyLib.verify() because we will try to decode the signature into a WebAuthn struct in memory
+     * Scenario: WebAuthn key sent a TypedDataSign signature but did not sign the typed data digest
      */
-    function test_isValidSignature_WebAuthnP256_wrappedSignature___typedDataSign_incorrectSignedDigest_reverts()
+    function test_isValidSignature_WebAuthnP256_wrappedSignature___typedDataSign_incorrectSignedDigest_invalidSigner()
         public
     {
         TestKey memory webAuthnP256Key = TestKeyManager.initDefault(KeyType.WebAuthnP256);
@@ -606,13 +693,15 @@ contract CaliburIsValidSignatureTest is DelegationHandler, HookHandler, ERC1271H
         bytes32 digest = mockERC1271VerifyingContract.hashTypedDataV4(contentsHash);
         // This is unsafe to sign because `digest` is not nested within a TypedDataSign
         bytes memory signature = webAuthnP256Key.sign(digest);
-        // Still build the signature as expected to pass in memory abi decoding
-        bytes memory typedDataSignSignature =
-            TypedDataSignBuilder.buildTypedDataSignSignature(signature, appDomainSeparator, contentsHash, contentsDescr);
+        // Still build the signature as expected to pass decoding of the signature
+        bytes memory typedDataSignSignature = TypedDataSignBuilder.buildTypedDataSignSignature(
+            signature, appDomainSeparator, contentsHash, contentsDescr
+        );
         bytes memory wrappedSignature = abi.encode(webAuthnP256Key.toKeyHash(), typedDataSignSignature, EMPTY_HOOK_DATA);
 
-        vm.expectRevert();
-        signerAccount.isValidSignature(digest, wrappedSignature);
+        // ensure the call returns the ERC1271 invalid magic value
+        vm.prank(address(mockERC1271VerifyingContract));
+        assertEq(signerAccount.isValidSignature(digest, wrappedSignature), _1271_INVALID_VALUE);
     }
 
     /**
@@ -696,8 +785,9 @@ contract CaliburIsValidSignatureTest is DelegationHandler, HookHandler, ERC1271H
         TestKey memory invalidSigner = TestKeyManager.withSeed(KeyType.Secp256k1, invalidPrivateKey);
         bytes memory signature = invalidSigner.sign(TEST_TYPED_DATA_SIGN_DIGEST);
         (bytes32 appDomainSeparator, string memory contentsDescr, bytes32 contentsHash) = getERC1271Fixtures();
-        bytes memory typedDataSignSignature =
-            TypedDataSignBuilder.buildTypedDataSignSignature(signature, appDomainSeparator, contentsHash, contentsDescr);
+        bytes memory typedDataSignSignature = TypedDataSignBuilder.buildTypedDataSignSignature(
+            signature, appDomainSeparator, contentsHash, contentsDescr
+        );
         // trying to spoof the root key hash causes the signature verification to fail
         bytes memory wrappedSignature = abi.encode(KeyLib.ROOT_KEY_HASH, typedDataSignSignature, EMPTY_HOOK_DATA);
 
@@ -790,9 +880,7 @@ contract CaliburIsValidSignatureTest is DelegationHandler, HookHandler, ERC1271H
      * 3. Not nested personal sign
      * = invalid signature
      */
-    function test_isValidSignature_P256_wrappedSignature__nestedPersonalSign_notSha256Hashed_invalidSignature()
-        public
-    {
+    function test_isValidSignature_P256_wrappedSignature__nestedPersonalSign_notSha256Hashed_invalidSignature() public {
         TestKey memory p256Key = TestKeyManager.initDefault(KeyType.P256);
 
         vm.prank(address(signerAccount));
@@ -846,8 +934,9 @@ contract CaliburIsValidSignatureTest is DelegationHandler, HookHandler, ERC1271H
     function test_isValidSignature_newDomainSeparatorInvalidatesOldSignatures() public {
         bytes memory signature = signerTestKey.sign(TEST_TYPED_DATA_SIGN_DIGEST);
         (bytes32 appDomainSeparator, string memory contentsDescr, bytes32 contentsHash) = getERC1271Fixtures();
-        bytes memory typedDataSignSignature =
-            TypedDataSignBuilder.buildTypedDataSignSignature(signature, appDomainSeparator, contentsHash, contentsDescr);
+        bytes memory typedDataSignSignature = TypedDataSignBuilder.buildTypedDataSignSignature(
+            signature, appDomainSeparator, contentsHash, contentsDescr
+        );
         bytes memory oldWrappedSignature = abi.encode(KeyLib.ROOT_KEY_HASH, typedDataSignSignature, EMPTY_HOOK_DATA);
         // ensure the call returns the ERC1271 magic value
         bytes32 digest = mockERC1271VerifyingContract.hashTypedDataV4(contentsHash);
@@ -858,7 +947,7 @@ contract CaliburIsValidSignatureTest is DelegationHandler, HookHandler, ERC1271H
 
         // Update the salt prefix, which changes the domain separator
         vm.prank(address(signerAccount));
-        signerAccount.updateSalt(uint96(0x1));
+        signerAccount.updateSalt();
 
         // Expect the old signature to be invalidated
         result = signerAccount.isValidSignature(digest, oldWrappedSignature);
@@ -868,8 +957,9 @@ contract CaliburIsValidSignatureTest is DelegationHandler, HookHandler, ERC1271H
         // Everything stays the same besides the signer account's domainBytes
         bytes memory signerAccountDomainBytes = IERC5267(address(signerAccount)).toDomainBytes();
         (string memory contentsName, string memory contentsType) = mockERC7739Utils.decodeContentsDescr(contentsDescr);
-        bytes32 newTypedDataSignDigest =
-            contentsHash.hashTypedDataSign(signerAccountDomainBytes, appDomainSeparator, contentsName, contentsType);
+        bytes32 newTypedDataSignDigest = mockERC7739Utils.hashTypedDataSign(
+            contentsHash, signerAccountDomainBytes, appDomainSeparator, contentsName, contentsType
+        );
 
         // Build the new wrapped signature
         bytes memory newSignature = signerTestKey.sign(newTypedDataSignDigest);
@@ -889,8 +979,9 @@ contract CaliburIsValidSignatureTest is DelegationHandler, HookHandler, ERC1271H
         TestKey memory invalidSigner = TestKeyManager.withSeed(KeyType.Secp256k1, invalidPrivateKey);
         bytes memory signature = invalidSigner.sign(TEST_TYPED_DATA_SIGN_DIGEST);
         (bytes32 appDomainSeparator, string memory contentsDescr, bytes32 contentsHash) = getERC1271Fixtures();
-        bytes memory typedDataSignSignature =
-            TypedDataSignBuilder.buildTypedDataSignSignature(signature, appDomainSeparator, contentsHash, contentsDescr);
+        bytes memory typedDataSignSignature = TypedDataSignBuilder.buildTypedDataSignSignature(
+            signature, appDomainSeparator, contentsHash, contentsDescr
+        );
         bytes memory wrappedSignature = abi.encode(invalidSigner.toKeyHash(), typedDataSignSignature, EMPTY_HOOK_DATA);
 
         // Built by the ERC1271 contract which hashes its domain separator to the contents hash

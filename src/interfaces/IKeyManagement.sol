@@ -26,8 +26,23 @@ interface IKeyManagement {
     /// @dev Cannot register the root key.
     error CannotRegisterRootKey();
 
+    /// @dev Cannot register a key.
+    error CannotRegisterKey(Key key);
+
     /// @dev Only admin keys can self-call.
     error OnlyAdminCanSelfCall();
+
+    /// @dev Only admin keys can call the EntryPoint, which manages account-owned deposit and stake.
+    error OnlyAdminCanCallEntryPoint();
+
+    /// @dev The key's publicKey is not encoded in its expected, minimal form.
+    error InvalidKey();
+    /// @dev Thrown when the settings have bits set in the region reserved for future use.
+
+    error InvalidSettings();
+
+    /// @dev The settings specify a hook that has no enabled callback flags or no deployed code.
+    error InvalidHook();
 
     /// @dev Registers the `key`.
     function register(Key memory key) external;

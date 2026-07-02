@@ -6,6 +6,8 @@ import {IKeyManagement} from "./interfaces/IKeyManagement.sol";
 import {BaseAuthorization} from "./BaseAuthorization.sol";
 import {Key, KeyLib} from "./libraries/KeyLib.sol";
 import {Settings, SettingsLib} from "./libraries/SettingsLib.sol";
+import {HooksLib} from "./libraries/HooksLib.sol";
+import {IHook} from "./interfaces/IHook.sol";
 
 /// @dev A base contract for managing keys
 abstract contract KeyManagement is IKeyManagement, BaseAuthorization {
@@ -20,6 +22,9 @@ abstract contract KeyManagement is IKeyManagement, BaseAuthorization {
     /// @inheritdoc IKeyManagement
     function register(Key memory key) external onlyThis {
         if (key.isRootKey()) revert CannotRegisterRootKey();
+        if (!key.isValidPublicKey()) revert InvalidKey();
+
+        _checkCanRegister(key);
 
         bytes32 keyHash = key.hash();
         keyStorage[keyHash] = abi.encode(key);
@@ -32,6 +37,15 @@ abstract contract KeyManagement is IKeyManagement, BaseAuthorization {
     function update(bytes32 keyHash, Settings settings) external onlyThis {
         if (keyHash.isRootKey()) revert CannotUpdateRootKey();
         if (!isRegistered(keyHash)) revert KeyDoesNotExist();
+        // Bits above the admin flag (bit 200) are reserved and must be unset
+        if (Settings.unwrap(settings) & SettingsLib.RESERVED_BITS != 0) revert InvalidSettings();
+
+        // Reject a hook with no enabled callbacks or no deployed code
+        address hook = address(settings.hook());
+        if (hook != address(0) && (uint160(hook) & HooksLib.ALL_FLAGS == 0 || hook.code.length == 0)) {
+            revert InvalidHook();
+        }
+
         keySettings[keyHash] = settings;
         emit KeySettingsUpdated(keyHash, settings);
     }
@@ -73,6 +87,10 @@ abstract contract KeyManagement is IKeyManagement, BaseAuthorization {
     function isRegistered(bytes32 keyHash) public view returns (bool) {
         return keyHashes.contains(keyHash);
     }
+
+    /// @notice Hook for additional validation before a key is registered
+    /// @dev Defaults to a no-op; overridden by implementations that reserve certain keys
+    function _checkCanRegister(Key memory key) internal view virtual {}
 
     /// @notice Reverts if the key settings are expired
     function _checkExpiry(Settings settings) internal view {

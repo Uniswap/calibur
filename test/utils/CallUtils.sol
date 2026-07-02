@@ -82,9 +82,8 @@ library CallUtils {
 
     /// @dev Create call to register key
     function encodeRegisterCall(TestKey memory newKey) internal pure returns (Call memory) {
-        return initDefault().withTo(SELF_CALL).withData(
-            abi.encodeWithSelector(IKeyManagement.register.selector, newKey.toKey())
-        );
+        return initDefault().withTo(SELF_CALL)
+            .withData(abi.encodeWithSelector(IKeyManagement.register.selector, newKey.toKey()));
     }
 
     /// @dev Create call to revoke key
@@ -94,9 +93,8 @@ library CallUtils {
 
     /// @dev Create call to update key settings
     function encodeUpdateCall(bytes32 keyHash, Settings settings) internal pure returns (Call memory) {
-        return initDefault().withTo(SELF_CALL).withData(
-            abi.encodeWithSelector(IKeyManagement.update.selector, keyHash, settings)
-        );
+        return initDefault().withTo(SELF_CALL)
+            .withData(abi.encodeWithSelector(IKeyManagement.update.selector, keyHash, settings));
     }
 
     // BatchedCall operations
@@ -105,11 +103,7 @@ library CallUtils {
         return BatchedCall({calls: new Call[](0), revertOnFailure: false});
     }
 
-    function withCalls(BatchedCall memory batchedCall, Call[] memory calls)
-        internal
-        pure
-        returns (BatchedCall memory)
-    {
+    function withCalls(BatchedCall memory batchedCall, Call[] memory calls) internal pure returns (BatchedCall memory) {
         batchedCall.calls = calls;
         return batchedCall;
     }
@@ -126,11 +120,7 @@ library CallUtils {
     // SignedBatchedCall operations
     function initSignedBatchedCall() internal pure returns (SignedBatchedCall memory) {
         return SignedBatchedCall({
-            batchedCall: initBatchedCall(),
-            keyHash: bytes32(0),
-            nonce: 0,
-            executor: address(0),
-            deadline: 0
+            batchedCall: initBatchedCall(), keyHash: bytes32(0), nonce: 0, executor: address(0), deadline: 0
         });
     }
 
@@ -177,23 +167,6 @@ library CallUtils {
     {
         signedBatchedCall.executor = executor;
         return signedBatchedCall;
-    }
-    /// @dev Create a single execute call for a multicall with a signed batched call
-
-    function encodeSignedExecuteCall(SignedBatchedCall memory signedBatchedCall, bytes memory signature)
-        internal
-        pure
-        returns (bytes memory)
-    {
-        bytes4 executeSelector =
-            bytes4(keccak256("execute((((address,uint256,bytes)[],bool),uint256,bytes32,address,uint256),bytes)"));
-        return abi.encodeWithSelector(executeSelector, signedBatchedCall, signature);
-    }
-
-    /// @dev Create a single execute call for a multicall with a batched call
-    function encodeBatchedExecuteCall(BatchedCall memory batchedCall) internal pure returns (bytes memory) {
-        bytes4 executeSelector = bytes4(keccak256("execute(((address,uint256,bytes)[],bool))"));
-        return abi.encodeWithSelector(executeSelector, batchedCall);
     }
 
     // HandlerCall operations

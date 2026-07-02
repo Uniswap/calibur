@@ -7,12 +7,16 @@ import {Key, KeyType, KeyLib} from "../src/libraries/KeyLib.sol";
 import {IERC7821} from "../src/interfaces/IERC7821.sol";
 import {IKeyManagement} from "../src/interfaces/IKeyManagement.sol";
 import {PackedUserOperation} from "account-abstraction/interfaces/PackedUserOperation.sol";
+import {IEntryPoint} from "account-abstraction/interfaces/IEntryPoint.sol";
 import {IERC4337Account} from "../src/ERC4337Account.sol";
 import {TestKey, TestKeyManager} from "./utils/TestKeyManager.sol";
 import {Settings, SettingsLib} from "../src/libraries/SettingsLib.sol";
 import {SettingsBuilder} from "./utils/SettingsBuilder.sol";
 import {Constants} from "./utils/Constants.sol";
 import {BaseAuthorization} from "../src/BaseAuthorization.sol";
+import {IHook} from "../src/interfaces/IHook.sol";
+import {HooksLib} from "../src/libraries/HooksLib.sol";
+import {MockHook} from "./utils/MockHook.sol";
 
 contract CaliburTest is DelegationHandler, HookHandler {
     using KeyLib for Key;
@@ -68,6 +72,63 @@ contract CaliburTest is DelegationHandler, HookHandler {
     function test_register_revertsWithUnauthorized() public {
         vm.expectRevert(BaseAuthorization.Unauthorized.selector);
         signerAccount.register(mockSecp256k1Key);
+    }
+
+    function testFuzz_register_revertsForOversizedSecp256k1Key(address addr, uint8 extra) public {
+        // address(this) decodes to the root key, which is rejected by a separate check
+        vm.assume(addr != address(0) && addr != address(signerAccount) && extra != 0);
+        // Trailing bytes produce a distinct keyHash that still verifies the same signer
+        Key memory aliasKey = Key(KeyType.Secp256k1, abi.encodePacked(abi.encode(addr), new bytes(extra)));
+        vm.prank(address(signerAccount));
+        vm.expectRevert(IKeyManagement.InvalidKey.selector);
+        signerAccount.register(aliasKey);
+    }
+
+    function test_register_revertsForZeroAddressSecp256k1Key() public {
+        Key memory zeroKey = Key(KeyType.Secp256k1, abi.encode(address(0)));
+        vm.prank(address(signerAccount));
+        vm.expectRevert(IKeyManagement.InvalidKey.selector);
+        signerAccount.register(zeroKey);
+    }
+
+    function testFuzz_register_revertsForWrongLengthP256Key(uint256 x, uint256 y, uint8 extra) public {
+        vm.assume(extra != 0);
+        bytes memory publicKey = abi.encodePacked(abi.encode(x, y), new bytes(extra));
+        vm.startPrank(address(signerAccount));
+        vm.expectRevert(IKeyManagement.InvalidKey.selector);
+        signerAccount.register(Key(KeyType.P256, publicKey));
+        vm.expectRevert(IKeyManagement.InvalidKey.selector);
+        signerAccount.register(Key(KeyType.WebAuthnP256, publicKey));
+        vm.stopPrank();
+    }
+
+    function test_register_revertsWhenKeyIsDefaultEntryPoint() public {
+        Key memory entryPointKey = Key(KeyType.Secp256k1, abi.encode(signerAccount.ENTRY_POINT()));
+        vm.prank(address(signerAccount));
+        vm.expectRevert(abi.encodeWithSelector(IKeyManagement.CannotRegisterKey.selector, entryPointKey));
+        signerAccount.register(entryPointKey);
+    }
+
+    function testFuzz_register_revertsWhenKeyIsEntryPoint(address entryPoint) public {
+        // The root key is rejected by a different check, so exclude it here
+        vm.assume(entryPoint != address(signerAccount) && entryPoint != address(0));
+        vm.startPrank(address(signerAccount));
+        signerAccount.updateEntryPoint(entryPoint);
+
+        // A Secp256k1 key for the configured EntryPoint collides with the caller key it would derive,
+        // so registration must be rejected
+        Key memory entryPointKey = Key(KeyType.Secp256k1, abi.encode(entryPoint));
+        vm.expectRevert(abi.encodeWithSelector(IKeyManagement.CannotRegisterKey.selector, entryPointKey));
+        signerAccount.register(entryPointKey);
+        vm.stopPrank();
+    }
+
+    function test_register_revertsWhenKeyIsSenderCreator() public {
+        address senderCreator = address(IEntryPoint(signerAccount.ENTRY_POINT()).senderCreator());
+        Key memory senderCreatorKey = Key(KeyType.Secp256k1, abi.encode(senderCreator));
+        vm.prank(address(signerAccount));
+        vm.expectRevert(abi.encodeWithSelector(IKeyManagement.CannotRegisterKey.selector, senderCreatorKey));
+        signerAccount.register(senderCreatorKey);
     }
 
     function test_register_expiryUpdated() public {
@@ -149,6 +210,119 @@ contract CaliburTest is DelegationHandler, HookHandler {
         keySettings = signerAccount.getKeySettings(keyHash);
         assertEq(keySettings.isAdmin(), true);
 
+        vm.stopPrank();
+    }
+
+    function testFuzz_update_revertsWhenReservedBitsDirty(uint56 reservedBits, uint40 expiration, bool isAdmin) public {
+        // Bits 201-255 sit above the admin flag (bit 200) and must be zero
+        uint256 dirtyBits = uint256(reservedBits) << 201;
+        vm.assume(dirtyBits != 0);
+        bytes32 keyHash = mockSecp256k1Key.hash();
+        vm.startPrank(address(signerAccount));
+        signerAccount.register(mockSecp256k1Key);
+
+        Settings settings = SettingsBuilder.init().fromExpiration(expiration).fromIsAdmin(isAdmin);
+        // Set reserved bits above the admin flag on top of an otherwise valid value
+        Settings dirty = Settings.wrap(Settings.unwrap(settings) | dirtyBits);
+
+        vm.expectRevert(IKeyManagement.InvalidSettings.selector);
+        signerAccount.update(keyHash, dirty);
+        vm.stopPrank();
+    }
+
+    function test_update_revertsWhen48BitValidUntilSpillsIntoAdmin() public {
+        // A uint48 ERC-4337 validUntil value shifted by 160 occupies bits 160-207. The low 40 bits land in
+        // expiration; the high 8 bits land in the admin byte. type(uint48).max << 160 would otherwise be read
+        // as expiration = type(uint40).max and isAdmin = true. update must reject it.
+        bytes32 keyHash = mockSecp256k1Key.hash();
+        vm.startPrank(address(signerAccount));
+        signerAccount.register(mockSecp256k1Key);
+
+        Settings spilled = Settings.wrap(uint256(type(uint48).max) << 160);
+        assertEq(spilled.isAdmin(), true);
+
+        vm.expectRevert(IKeyManagement.InvalidSettings.selector);
+        signerAccount.update(keyHash, spilled);
+        vm.stopPrank();
+    }
+
+    function testFuzz_update_revertsWhenAdminByteNotZeroOrOne(uint8 adminByte, uint40 expiration) public {
+        // Only bit 200 may be set in the admin byte; any value above 1 spills into the reserved region
+        vm.assume(adminByte > 1);
+        bytes32 keyHash = mockSecp256k1Key.hash();
+        vm.startPrank(address(signerAccount));
+        signerAccount.register(mockSecp256k1Key);
+
+        Settings dirty = Settings.wrap(
+            (Settings.unwrap(SettingsBuilder.init().fromExpiration(expiration))) | (uint256(adminByte) << 200)
+        );
+
+        vm.expectRevert(IKeyManagement.InvalidSettings.selector);
+        signerAccount.update(keyHash, dirty);
+        vm.stopPrank();
+    }
+
+    function testFuzz_update_succeedsWhenReservedBitsUnset(uint40 expiration, bool isAdmin) public {
+        bytes32 keyHash = mockSecp256k1Key.hash();
+        vm.startPrank(address(signerAccount));
+        signerAccount.register(mockSecp256k1Key);
+
+        // Use a valid hook (code + flags) so the update passes hook validation; the focus here is
+        // that clean reserved bits round-trip exactly across the used fields.
+        Settings settings =
+            SettingsBuilder.init().fromExpiration(expiration).fromIsAdmin(isAdmin).fromHook(IHook(address(mockHook)));
+        signerAccount.update(keyHash, settings);
+
+        // Settings with clean reserved bits must round-trip exactly: the check must not touch used fields
+        assertEq(Settings.unwrap(signerAccount.getKeySettings(keyHash)), Settings.unwrap(settings));
+        vm.stopPrank();
+    }
+
+    function test_update_revertsWhenHookHasCodeButNoFlags() public {
+        bytes32 keyHash = mockSecp256k1Key.hash();
+        vm.startPrank(address(signerAccount));
+        signerAccount.register(mockSecp256k1Key);
+
+        // noHooks (0xC0..00) has code etched but no flag bits set, so no callback would ever fire
+        vm.expectRevert(IKeyManagement.InvalidHook.selector);
+        signerAccount.update(keyHash, SettingsBuilder.init().fromHook(IHook(address(noHooks))));
+        vm.stopPrank();
+    }
+
+    function test_update_revertsWhenHookHasFlagsButNoCode() public {
+        bytes32 keyHash = mockSecp256k1Key.hash();
+        vm.startPrank(address(signerAccount));
+        signerAccount.register(mockSecp256k1Key);
+
+        // BEFORE_EXECUTE_FLAG (0x08) set but nothing deployed at the address
+        address hookAddr = 0xc000000000000000000000000000000000000008;
+        assertEq(hookAddr.code.length, 0);
+
+        vm.expectRevert(IKeyManagement.InvalidHook.selector);
+        signerAccount.update(keyHash, SettingsBuilder.init().fromHook(IHook(hookAddr)));
+        vm.stopPrank();
+    }
+
+    /// @dev A hook is accepted iff it has both code and at least one flag; vary only the
+    ///      flag-bearing low byte (base 0xC0.. avoids precompiles) with code always present.
+    /// forge-config: default.fuzz.runs = 256
+    function testFuzz_update_hookFlagValidation(uint8 lowByte) public {
+        bytes32 keyHash = mockSecp256k1Key.hash();
+        vm.startPrank(address(signerAccount));
+        signerAccount.register(mockSecp256k1Key);
+
+        address hookAddr = address(uint160(0xC000000000000000000000000000000000000000) | uint160(lowByte));
+        vm.etch(hookAddr, address(new MockHook()).code);
+
+        Settings keySettings = SettingsBuilder.init().fromHook(IHook(hookAddr));
+
+        if (uint160(hookAddr) & HooksLib.ALL_FLAGS == 0) {
+            vm.expectRevert(IKeyManagement.InvalidHook.selector);
+            signerAccount.update(keyHash, keySettings);
+        } else {
+            signerAccount.update(keyHash, keySettings);
+            assertEq(address(signerAccount.getKeySettings(keyHash).hook()), hookAddr);
+        }
         vm.stopPrank();
     }
 
@@ -331,6 +505,71 @@ contract CaliburTest is DelegationHandler, HookHandler {
         signerAccount.updateEntryPoint(newEntryPoint);
 
         assertEq(signerAccount.ENTRY_POINT(), newEntryPoint);
+    }
+
+    function test_validateUserOp_rawSignature_withRootKey_succeeds() public {
+        PackedUserOperation memory userOp;
+        bytes32 userOpHash = entryPoint.getUserOpHash(userOp);
+        bytes memory signature = signerTestKey.sign(userOpHash);
+        userOp.signature = signature;
+
+        vm.prank(address(entryPoint));
+        uint256 validationData = signerAccount.validateUserOp(userOp, userOpHash, 0);
+        assertEq(validationData, 0);
+    }
+
+    function test_validateUserOp_rawSignature_withRootKey_wrongDigest_returnsInvalidSignature() public {
+        PackedUserOperation memory userOp;
+        bytes32 userOpHash = entryPoint.getUserOpHash(userOp);
+        bytes32 wrongUserOpHash = keccak256("invalid");
+        bytes memory signature = signerTestKey.sign(wrongUserOpHash);
+        userOp.signature = signature;
+
+        vm.prank(address(entryPoint));
+        uint256 validationData = signerAccount.validateUserOp(userOp, userOpHash, 0);
+        assertEq(validationData, 1);
+    }
+
+    function test_validateUserOp_rawSignature_withNonRootKey_returnsInvalidSignature() public {
+        PackedUserOperation memory userOp;
+        bytes32 userOpHash = entryPoint.getUserOpHash(userOp);
+        TestKey memory p256Key = TestKeyManager.withSeed(KeyType.P256, 1234);
+        bytes memory signature = p256Key.sign(userOpHash);
+        userOp.signature = signature;
+
+        vm.prank(address(entryPoint));
+        uint256 validationData = signerAccount.validateUserOp(userOp, userOpHash, 0);
+        assertEq(validationData, 1);
+    }
+
+    function test_validateUserOp_wrappedSignature_withRootKey_succeeds() public {
+        PackedUserOperation memory userOp;
+        bytes32 userOpHash = entryPoint.getUserOpHash(userOp);
+        bytes memory signature = signerTestKey.sign(userOpHash);
+        // No hook data for root key
+        bytes memory wrappedSignature = abi.encode(KeyLib.ROOT_KEY_HASH, signature, EMPTY_HOOK_DATA);
+        userOp.signature = wrappedSignature;
+
+        vm.prank(address(entryPoint));
+        uint256 validationData = signerAccount.validateUserOp(userOp, userOpHash, 0);
+        assertEq(validationData, 0);
+    }
+
+    /// @dev An unregistered (non-root) key hash must report a signature failure through validationData rather than reverting.
+    function test_validateUserOp_wrappedSignature_withUnregisteredKey_returnsInvalidSignature() public {
+        TestKey memory unregisteredKey = TestKeyManager.withSeed(KeyType.P256, 1234);
+        assertEq(signerAccount.isRegistered(unregisteredKey.toKeyHash()), false);
+
+        PackedUserOperation memory userOp;
+        userOp.sender = address(signerAccount);
+        bytes32 userOpHash = entryPoint.getUserOpHash(userOp);
+        bytes memory signature = unregisteredKey.sign(userOpHash);
+        bytes memory wrappedSignature = abi.encode(unregisteredKey.toKeyHash(), signature, EMPTY_HOOK_DATA);
+        userOp.signature = wrappedSignature;
+
+        vm.prank(address(entryPoint));
+        uint256 validationData = signerAccount.validateUserOp(userOp, userOpHash, 0);
+        assertEq(validationData, 1);
     }
 
     function test_validateUserOp_validSignature_withExpiration() public {

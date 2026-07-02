@@ -117,10 +117,11 @@ contract ERC712Test is DelegationHandler, TokenHandler, FFISignTypedData {
     }
 
     function test_updateSalt() public {
+        // _saltPrefix starts at 0, so a single increment yields 1
         uint96 _prefix = uint96(0x1);
 
         vm.prank(address(signerAccount));
-        signerAccount.updateSalt(_prefix);
+        signerAccount.updateSalt();
 
         (, string memory name, string memory version, uint256 chainId, address verifyingContract, bytes32 salt,) =
             signerAccount.eip712Domain();

@@ -5,6 +5,8 @@ import {EnumerableSetLib} from "solady/utils/EnumerableSetLib.sol";
 import {Receiver} from "solady/accounts/Receiver.sol";
 import {P256} from "@openzeppelin/contracts/utils/cryptography/P256.sol";
 import {IAccount} from "account-abstraction/interfaces/IAccount.sol";
+import {IEntryPoint} from "account-abstraction/interfaces/IEntryPoint.sol";
+import {ISenderCreator} from "account-abstraction/interfaces/ISenderCreator.sol";
 import {PackedUserOperation} from "account-abstraction/interfaces/PackedUserOperation.sol";
 import {IERC1271} from "./interfaces/IERC1271.sol";
 import {IERC7821} from "./interfaces/IERC7821.sol";
@@ -19,12 +21,10 @@ import {ERC7821} from "./ERC7821.sol";
 import {ERC7914} from "./ERC7914.sol";
 import {ERC7739} from "./ERC7739.sol";
 import {KeyManagement} from "./KeyManagement.sol";
-import {Multicall} from "./Multicall.sol";
 import {NonceManager} from "./NonceManager.sol";
 import {BatchedCallLib, BatchedCall} from "./libraries/BatchedCallLib.sol";
 import {Call, CallLib} from "./libraries/CallLib.sol";
 import {CalldataDecoder} from "./libraries/CalldataDecoder.sol";
-import {ERC7739Utils} from "./libraries/ERC7739Utils.sol";
 import {HooksLib} from "./libraries/HooksLib.sol";
 import {Key, KeyLib} from "./libraries/KeyLib.sol";
 import {ModeDecoder} from "./libraries/ModeDecoder.sol";
@@ -47,7 +47,6 @@ contract Calibur is
     ERC7201,
     ERC7739,
     EIP712,
-    Multicall,
     Receiver
 {
     using EnumerableSetLib for EnumerableSetLib.Bytes32Set;
@@ -59,7 +58,6 @@ contract Calibur is
     using CalldataDecoder for bytes;
     using HooksLib for IHook;
     using SettingsLib for Settings;
-    using ERC7739Utils for bytes;
     using WrappedSignatureLib for bytes;
 
     /// @inheritdoc ICalibur
@@ -84,16 +82,20 @@ contract Calibur is
         execute(batchedCall);
     }
 
-    /// @dev This function is executeable only by the EntryPoint contract, and is the main pathway for UserOperations to be executed.
-    /// UserOperations can be executed through the execute function, but another method of authorization (ie through a passed in signature) is required.
-    /// userOp.callData is abi.encodeCall(IAccountExecute.executeUserOp.selector, (abi.encode(Call[]), bool))
-    /// Note that this contract is only compatible with Entrypoint versions v0.7.0 and v0.8.0. It is not compatible with v0.6.0, as that version does not support the "executeUserOp" selector.
+    /// @notice This function is executeable only by the EntryPoint contract, and is the main pathway for UserOperations to be executed.
+    /// @dev UserOperations can be executed through the execute function, but another method of authorization (ie through a passed in signature) is required.
+    ///      `userOp.callData` is `abi.encodeCall(IAccountExecute.executeUserOp.selector, (abi.encode(Call[]), bool))`
+    ///      Note that this contract is only compatible with Entrypoint versions v0.7.0 and v0.8.0.
+    ///      It is not compatible with v0.6.0, as that version does not support the "executeUserOp" selector.
     function executeUserOp(PackedUserOperation calldata userOp, bytes32) external onlyEntryPoint {
-        // Parse the keyHash from the signature. This is the keyHash that has been pre-validated as the correct signer over the UserOp data
-        // and must be used to check further on-chain permissions over the call execution.
-        (bytes32 keyHash,,) = userOp.signature.decodeWithKeyHashAndHookData();
+        // If no keyHash is provided, we know that `validateUserOp` has validated the raw signature against the root key.
+        // This default behavior is safe as long as the Entrypoint ensures `validateUserOp` is called before this function
+        bytes32 keyHash;
+        if (!userOp.signature.isRawSignature()) {
+            // Otherwise, parse the keyHash from the signature and pass it along to verify other permissions over the call execution.
+            (keyHash,,) = userOp.signature.decodeWithKeyHashAndHookData();
+        }
 
-        // The mode is only passed in to signify the EXEC_TYPE of the calls.
         bytes calldata executionData = userOp.callData.removeSelector();
         (BatchedCall memory batchedCall) = abi.decode(executionData, (BatchedCall));
 
@@ -111,21 +113,31 @@ contract Calibur is
         returns (uint256 validationData)
     {
         _payEntryPoint(missingAccountFunds);
-        (bytes32 keyHash, bytes calldata signature, bytes calldata hookData) =
-            userOp.signature.decodeWithKeyHashAndHookData();
 
-        /// The userOpHash does not need to be made replay-safe, as the EntryPoint will always call the sender contract of the UserOperation for validation.
-        Key memory key = getKey(keyHash);
-        bool isValid = key.verify(userOpHash, signature);
+        if (userOp.signature.isRawSignature()) {
+            validationData = KeyLib.toRootKey().verify(userOpHash, userOp.signature)
+                ? SIG_VALIDATION_SUCCEEDED
+                : SIG_VALIDATION_FAILED;
+        } else {
+            (bytes32 keyHash, bytes calldata signature, bytes calldata hookData) =
+                userOp.signature.decodeWithKeyHashAndHookData();
 
-        Settings settings = getKeySettings(keyHash);
+            /// Per ERC-4337, return invalid signature rather than reverting if the key is not registered
+            if (!keyHash.isRootKey() && !isRegistered(keyHash)) return SIG_VALIDATION_FAILED;
 
-        /// validationData is (uint256(validAfter) << (160 + 48)) | (uint256(validUntil) << 160) | (success ? 0 : 1)
-        /// `validAfter` is always 0.
-        validationData =
-            isValid ? uint256(settings.expiration()) << 160 | SIG_VALIDATION_SUCCEEDED : SIG_VALIDATION_FAILED;
+            Key memory key = getKey(keyHash);
+            /// The userOpHash does not need to be made replay-safe, as the EntryPoint will always call the sender contract of the UserOperation for validation.
+            bool isValid = key.verify(userOpHash, signature);
 
-        settings.hook().handleAfterValidateUserOp(keyHash, userOp, userOpHash, validationData, hookData);
+            Settings settings = getKeySettings(keyHash);
+
+            /// validationData is (uint256(validAfter) << (160 + 48)) | (uint256(validUntil) << 160) | (success ? 0 : 1)
+            /// `validAfter` is always 0.
+            validationData =
+                isValid ? uint256(settings.expiration()) << 160 | SIG_VALIDATION_SUCCEEDED : SIG_VALIDATION_FAILED;
+
+            settings.hook().handleAfterValidateUserOp(keyHash, userOp, userOpHash, validationData, hookData);
+        }
     }
 
     /// @inheritdoc ERC1271
@@ -141,10 +153,15 @@ contract Calibur is
                 // Forces the compiler to optimize for smaller bytecode size.
                 if (uint256(digest) == ~wrappedSignature.length / 0xffff * 0x7739) return 0x77390001;
             }
-            // If the signature is 64 or 65 bytes, it must be validated as an ECDSA signature from the root key
-            // We skip any checks against expiry or hooks because settings are not supported on the root key
+            // If the signature is 64 or 65 bytes, it must be validated against the root key.
+            // We skip any checks against expiry or hooks because settings are not supported on the root key.
+            // Accept either a raw ECDSA signature over `digest` or an ERC-7739 PersonalSign over the account-nested digest.
             else if (wrappedSignature.isRawSignature()) {
-                if (KeyLib.toRootKey().verify(digest, wrappedSignature)) {
+                Key memory rootKey = KeyLib.toRootKey();
+                if (
+                    rootKey.verify(digest, wrappedSignature)
+                        || _isValidNestedPersonalSig(rootKey, digest, domainSeparator(), wrappedSignature)
+                ) {
                     return _1271_MAGIC_VALUE;
                 } else {
                     return _1271_INVALID_VALUE;
@@ -159,8 +176,8 @@ contract Calibur is
         /// Signature deduction flow as specified by ERC-7739
         // If the signature contains enough data for a TypedDataSign, try the TypedDataSign flow
         bool isValid = _isValidTypedDataSig(key, digest, domainBytes(), signature)
-        // If the signature is not valid as a TypedDataSign, try the NestedPersonalSign flow
-        || _isValidNestedPersonalSig(key, digest, domainSeparator(), signature);
+            // If the signature is not valid as a TypedDataSign, try the NestedPersonalSign flow
+            || _isValidNestedPersonalSig(key, digest, domainSeparator(), signature);
 
         // Early return if the signature is invalid
         if (!isValid) return _1271_INVALID_VALUE;
@@ -171,6 +188,21 @@ contract Calibur is
         settings.hook().handleAfterIsValidSignature(keyHash, digest, hookData);
 
         return _1271_MAGIC_VALUE;
+    }
+
+    /// @notice Prevent registering protected addresses as keys on the account
+    function _checkCanRegister(Key memory key) internal view override {
+        bytes32 keyHash = key.hash();
+        address entryPoint = ENTRY_POINT();
+        if (keyHash == entryPoint.toKeyHash()) revert IKeyManagement.CannotRegisterKey(key);
+
+        // success is not required to be true to prevent bricking of all key registrations if the entryPoint is not set up correctly
+        (bool success, bytes memory output) =
+            entryPoint.staticcall(abi.encodeWithSelector(IEntryPoint.senderCreator.selector));
+        if (success && output.length >= 32) {
+            address senderCreator = abi.decode(output, (address));
+            if (keyHash == senderCreator.toKeyHash()) revert IKeyManagement.CannotRegisterKey(key);
+        }
     }
 
     /// @dev Iterates through calls, reverting according to specified failure mode
@@ -194,6 +226,10 @@ contract Calibur is
         // However, admin keys CAN update their own settings and evade the hook checks below
         // To prevent this, we recommend adding a hook which disallows calls by admin keys to the `register` and `update` functions
         if (!settings.isAdmin() && to == address(this)) revert IKeyManagement.OnlyAdminCanSelfCall();
+
+        // Calls to the EntryPoint move account-owned deposit/stake (e.g. withdrawTo drains the account's deposit
+        // as a zero-value call), so they are gated to admin keys like self-calls.
+        if (!settings.isAdmin() && to == ENTRY_POINT()) revert IKeyManagement.OnlyAdminCanCallEntryPoint();
 
         IHook hook = settings.hook();
         bytes memory beforeExecuteData = hook.handleBeforeExecute(keyHash, to, _call.value, _call.data);

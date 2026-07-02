@@ -15,7 +15,6 @@ classDiagram
     Calibur --|> ERC7201
     Calibur --|> ERC7739
     Calibur --|> EIP712
-    Calibur --|> Multicall
     Calibur --|> Receiver
     
     ICalibur --|> IKeyManagement
@@ -27,7 +26,6 @@ classDiagram
     ICalibur --|> IERC7201
     ICalibur --|> IERC7914
     ICalibur --|> INonceManager
-    ICalibur --|> IMulticall
     
     EIP712 --|> IERC5267
     ERC4337Account --|> IAccount
@@ -312,17 +310,8 @@ sequenceDiagram
     Account->>Account: Emit ApproveNative event
     Account-->>-Caller: Return true
 
-    alt Approve Transient
-        Caller->>+Account: approveNativeTransient(spender, amount)
-        Account->>Account: Check onlyThis modifier
-        Account->>Account: TransientNativeAllowance.set(spender, amount) 
-        Account->>Account: Emit ApproveNativeTransient event
-        Account-->>-Caller: Return true
-    end
-    
     Spender->>+Account: transferFromNative(from, recipient, amount)
     Account->>Account: If amount == 0, return true
-    Account->>Account: _transferFrom(from, recipient, amount, false)
     Account->>Account: Check if from == address(this)
     Account->>Account: Check if nativeAllowance[msg.sender] >= amount
     Account->>Account: Update allowance if not max
@@ -331,19 +320,6 @@ sequenceDiagram
     recipient-->>-Account: Success
     Account->>Account: Emit TransferFromNative event
     Account-->>-Spender: Return true
-    
-    alt Transient Transfer
-        Spender->>+Account: transferFromNativeTransient(from, recipient, amount)
-        Account->>Account: If amount == 0, return true
-        Account->>Account: _transferFrom(from, recipient, amount, true)
-        Account->>Account: Check if from == address(this)
-        Account->>Account: Check if transientNativeAllowance(msg.sender) >= amount
-        Account->>Account: Update transient allowance if not max
-        Account->>+recipient: Transfer ETH value with call
-        recipient-->>-Account: Success
-        Account->>Account: Emit TransferFromNativeTransient event
-        Account-->>-Spender: Return true
-    end
     
     Note over Account: If transfer fails at any point, revert with TransferNativeFailed
 ```

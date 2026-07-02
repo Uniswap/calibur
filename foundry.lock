@@ -1,0 +1,26 @@
+{
+  "lib/account-abstraction": {
+    "rev": "3c9ef104688649b7ba6ee0c788aa494783ee24f7"
+  },
+  "lib/erc20-eth": {
+    "rev": "32b494bfed88acffdd86485f4e14b744bc634655"
+  },
+  "lib/forge-std": {
+    "rev": "3b20d60d14b343ee4f908cb8079495c07f5e8981"
+  },
+  "lib/openzeppelin-contracts": {
+    "tag": {
+      "name": "v5.6.0",
+      "rev": "56a3de2cea907c9a500d32e70c275f68393b7ba6"
+    }
+  },
+  "lib/permit2": {
+    "rev": "cc56ad0f3439c502c246fc5cfcc3db92bb8b7219"
+  },
+  "lib/solady": {
+    "rev": "1eb89b9af0a09468c6ccff51ce8ed5eb520b4fb5"
+  },
+  "lib/webauthn-sol": {
+    "rev": "619f20ab0f074fef41066ee4ab24849a913263b2"
+  }
+}

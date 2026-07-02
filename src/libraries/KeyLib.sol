@@ -22,13 +22,25 @@ struct Key {
 
 library KeyLib {
     /// @notice The sentinel hash value used to represent the root key
-
     bytes32 public constant ROOT_KEY_HASH = bytes32(0);
 
     /// @notice Hashes a key
     /// @dev uses the key type and the public key to produce a hash
     function hash(Key memory key) internal pure returns (bytes32) {
         return keccak256(abi.encode(key.keyType, keccak256(key.publicKey)));
+    }
+
+    /// @notice Returns whether the key's publicKey is encoded in its expected, minimal form
+    /// @dev Secp256k1 must be abi.encode(address) (32 bytes); P256 and WebAuthnP256 must be
+    ///      abi.encode(uint256 x, uint256 y) (64 bytes).
+    function isValidPublicKey(Key memory key) internal pure returns (bool) {
+        if (key.keyType == KeyType.Secp256k1) {
+            // Must be exactly abi.encode(address): 32 bytes, no dirty upper bits, and non-zero
+            if (key.publicKey.length != 32) return false;
+            uint256 word = abi.decode(key.publicKey, (uint256));
+            return word != 0 && word <= type(uint160).max;
+        }
+        return key.publicKey.length == 64;
     }
 
     /// @notice Returns whether the keyHash is the root key hash
@@ -60,6 +72,8 @@ library KeyLib {
             address result = ECDSA.tryRecoverCalldata(_hash, signature);
             isValid = result == address(0) ? false : result == abi.decode(key.publicKey, (address));
         } else if (key.keyType == KeyType.P256) {
+            // P256 signatures must be exactly (bytes32 r, bytes32 s) with no trailing bytes
+            if (signature.length != 64) return false;
             // Extract x,y from the public key
             (bytes32 x, bytes32 y) = abi.decode(key.publicKey, (bytes32, bytes32));
             // Split signature into r and s values.
@@ -70,6 +84,7 @@ library KeyLib {
             (uint256 x, uint256 y) = abi.decode(key.publicKey, (uint256, uint256));
             // Decode the signature into the WebAuthnAuth struct
             WebAuthn.WebAuthnAuth memory auth = abi.decode(signature, (WebAuthn.WebAuthnAuth));
+            // Calibur does not enforce WebAuthn signatures which require user verification
             isValid = WebAuthn.verify({challenge: abi.encode(_hash), requireUV: false, webAuthnAuth: auth, x: x, y: y});
         } else {
             isValid = false;

@@ -32,4 +32,8 @@ contract MockKeyLib {
     function verify(Key calldata key, bytes32 digest, bytes calldata signature) public view returns (bool) {
         return KeyLib.verify(key, digest, signature);
     }
+
+    function isValidPublicKey(Key memory key) public pure returns (bool) {
+        return key.isValidPublicKey();
+    }
 }

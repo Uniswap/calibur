@@ -21,6 +21,10 @@ library HooksLib {
     uint160 internal constant BEFORE_EXECUTE_FLAG = 1 << 3;
     uint160 internal constant AFTER_EXECUTE_FLAG = 1 << 4;
 
+    /// @notice Bitmask of every defined hook flag
+    uint160 internal constant ALL_FLAGS = AFTER_VERIFY_SIGNATURE_FLAG | AFTER_VALIDATE_USER_OP_FLAG
+        | AFTER_IS_VALID_SIGNATURE_FLAG | BEFORE_EXECUTE_FLAG | AFTER_EXECUTE_FLAG;
+
     /// @notice Hook did not return its selector
     error InvalidHookResponse();
 

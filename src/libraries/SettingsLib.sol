@@ -9,14 +9,17 @@ type Settings is uint256;
 /// @notice Key settings are packed into a uint256 where
 /// - the least significant 20 bytes (0-19) specify an address to callout to for extra or overrideable validation.
 /// - bytes 20-24 are used for the expiration timestamp.
-/// - byte 25 is used to specify if the key is an admin key or not.
-/// - the remaining bytes are reserved for future use.
-///   6 bytes |   1 byte       | 5 bytes           | 20 bytes
-///   UNUSED  |   isAdmin      | expiration        | hook
+/// - bit 200 specifies whether the key is an admin key.
+/// - bits 201-255 are reserved for future use and must be unset.
+///   bits 201-255 |  bit 200  | 5 bytes      | 20 bytes
+///   RESERVED     |  isAdmin  | expiration   | hook
 library SettingsLib {
     uint160 constant MASK_20_BYTES = uint160(0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF);
     uint40 constant MASK_5_BYTES = uint40(0xFFFFFFFFFF);
-    uint8 constant MASK_1_BYTE = uint8(0xFF);
+
+    /// @notice Mask covering bits 201-255, which sit above the admin flag (bit 200) and are reserved for future use.
+    ///         The admin flag is a single bit, so a settings word with these bits set is rejected on update.
+    uint256 constant RESERVED_BITS = type(uint256).max << 201;
 
     Settings constant DEFAULT = Settings.wrap(0);
     // RootKey has the settings: (isAdmin = true, 0 expiration, no hook)
@@ -24,9 +27,8 @@ library SettingsLib {
 
     /// @notice Returns whether the key is an admin key
     function isAdmin(Settings settings) internal pure returns (bool _isAdmin) {
-        uint8 mask = MASK_1_BYTE;
         assembly {
-            _isAdmin := and(shr(200, settings), mask)
+            _isAdmin := and(shr(200, settings), 1)
         }
     }
 

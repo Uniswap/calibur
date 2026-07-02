@@ -16,7 +16,7 @@ import {Permit2Utils} from "./utils/Permit2Utils.sol";
 import {IPermit2} from "../lib/permit2/src/interfaces/IPermit2.sol";
 import {IAllowanceTransfer} from "../lib/permit2/src/interfaces/IAllowanceTransfer.sol";
 import {PermitHash} from "../lib/permit2/src/libraries/PermitHash.sol";
-import {ERC20ETH} from "../lib/erc20-eth/src/ERC20Eth.sol";
+import {ERC20ETH} from "../lib/erc20-eth/src/ERC20ETH.sol";
 
 contract ERC7739Test is DelegationHandler, TokenHandler, ERC1271Handler, FFISignTypedData {
     using TestKeyManager for TestKey;
@@ -66,8 +66,9 @@ contract ERC7739Test is DelegationHandler, TokenHandler, ERC1271Handler, FFISign
             mockERC7739Utils.decodeContentsDescr(contentsDescrExplicit);
 
         bytes memory signerAccountDomainBytes = IERC5267(address(signerAccount)).toDomainBytes();
-        bytes32 typedDataSignDigest =
-            contentsHash.hashTypedDataSign(signerAccountDomainBytes, appSeparator, contentsName, contentsType);
+        bytes32 typedDataSignDigest = mockERC7739Utils.hashTypedDataSign(
+            contentsHash, signerAccountDomainBytes, appSeparator, contentsName, contentsType
+        );
 
         // Make it clear that the verifying contract is set properly.
         address verifyingContract = address(signerAccount);
@@ -105,8 +106,9 @@ contract ERC7739Test is DelegationHandler, TokenHandler, ERC1271Handler, FFISign
             mockERC7739Utils.decodeContentsDescr(contentsDescrImplicit);
 
         bytes memory signerAccountDomainBytes = IERC5267(address(signerAccount)).toDomainBytes();
-        bytes32 typedDataSignDigest =
-            contentsHash.hashTypedDataSign(signerAccountDomainBytes, appSeparator, contentsName, contentsType);
+        bytes32 typedDataSignDigest = mockERC7739Utils.hashTypedDataSign(
+            contentsHash, signerAccountDomainBytes, appSeparator, contentsName, contentsType
+        );
 
         // Make it clear that the verifying contract is set properly.
         address verifyingContract = address(signerAccount);
@@ -135,7 +137,7 @@ contract ERC7739Test is DelegationHandler, TokenHandler, ERC1271Handler, FFISign
         // Give the signer account some tokens to permit
         uint256 initialBalance = 10000;
         deal(address(tokenA), address(signerAccount), initialBalance);
-        
+
         // Approve permit2 to spend tokens on behalf of the signer account
         vm.prank(address(signerAccount));
         tokenA.approve(address(permit2), type(uint256).max);
@@ -144,10 +146,7 @@ contract ERC7739Test is DelegationHandler, TokenHandler, ERC1271Handler, FFISign
         uint160 allowanceAmount = 1000;
         IAllowanceTransfer.PermitSingle memory permitSingle = IAllowanceTransfer.PermitSingle({
             details: IAllowanceTransfer.PermitDetails({
-                token: address(tokenA), 
-                amount: allowanceAmount, 
-                expiration: uint48(block.timestamp + 1 hours), 
-                nonce: 0
+                token: address(tokenA), amount: allowanceAmount, expiration: uint48(block.timestamp + 1 hours), nonce: 0
             }),
             spender: address(this),
             sigDeadline: block.timestamp + 1 hours
@@ -156,19 +155,24 @@ contract ERC7739Test is DelegationHandler, TokenHandler, ERC1271Handler, FFISign
         // Generate the permit2 domain separator and hash
         bytes32 permit2DomainSeparator = permit2.DOMAIN_SEPARATOR();
         bytes32 permitHash = permitSingle.hash();
-        
+
         // Build ERC-7739 TypedDataSign signature for permit2
-        string memory contentsDescr = "PermitDetails(address token,uint160 amount,uint48 expiration,uint48 nonce)PermitSingle(PermitDetails details,address spender,uint256 sigDeadline)PermitSingle";
+        string memory contentsDescr =
+            "PermitDetails(address token,uint160 amount,uint48 expiration,uint48 nonce)PermitSingle(PermitDetails details,address spender,uint256 sigDeadline)PermitSingle";
         (string memory contentsName, string memory contentsType) = mockERC7739Utils.decodeContentsDescr(contentsDescr);
 
         bytes memory signerAccountDomainBytes = IERC5267(address(signerAccount)).toDomainBytes();
-        bytes32 typedDataSignDigest = permitHash.hashTypedDataSign(signerAccountDomainBytes, permit2DomainSeparator, contentsName, contentsType);
+        bytes32 typedDataSignDigest = mockERC7739Utils.hashTypedDataSign(
+            permitHash, signerAccountDomainBytes, permit2DomainSeparator, contentsName, contentsType
+        );
 
         // Sign the digest with the test key
         bytes memory signature = testKey.sign(typedDataSignDigest);
 
         // Build the TypedDataSign signature for ERC-7739
-        bytes memory typedDataSignSignature = TypedDataSignBuilder.buildTypedDataSignSignature(signature, permit2DomainSeparator, permitHash, contentsDescr);
+        bytes memory typedDataSignSignature = TypedDataSignBuilder.buildTypedDataSignSignature(
+            signature, permit2DomainSeparator, permitHash, contentsDescr
+        );
 
         // Wrap the signature with keyHash and empty hook data
         bytes memory wrappedSignature = abi.encode(testKey.toKeyHash(), typedDataSignSignature, bytes(""));
@@ -176,9 +180,10 @@ contract ERC7739Test is DelegationHandler, TokenHandler, ERC1271Handler, FFISign
         // Test by calling permit2.permit() which will internally call isValidSignature() on the signer account
         // This should succeed without reverting, proving the signature is valid
         permit2.permit(address(signerAccount), permitSingle, wrappedSignature);
-        
+
         // Verify the allowance was actually set
-        (uint160 allowance, uint48 expiration, uint48 nonce) = permit2.allowance(address(signerAccount), address(tokenA), address(this));
+        (uint160 allowance, uint48 expiration, uint48 nonce) =
+            permit2.allowance(address(signerAccount), address(tokenA), address(this));
         assertEq(allowance, allowanceAmount);
         assertEq(expiration, uint48(block.timestamp + 1 hours));
         assertEq(nonce, 1); // nonce should be incremented after permit
@@ -193,11 +198,11 @@ contract ERC7739Test is DelegationHandler, TokenHandler, ERC1271Handler, FFISign
 
         // Deploy ERC20ETH contract for native ETH transfers
         ERC20ETH erc20Eth = new ERC20ETH();
-        
-        // Give the signer account some ETH 
+
+        // Give the signer account some ETH
         uint256 initialEthBalance = 10 ether;
         vm.deal(address(signerAccount), initialEthBalance);
-        
+
         // Approve ERC20ETH to spend native ETH on behalf of the signer account
         vm.prank(address(signerAccount));
         signerAccount.approveNative(address(erc20Eth), type(uint256).max);
@@ -206,9 +211,9 @@ contract ERC7739Test is DelegationHandler, TokenHandler, ERC1271Handler, FFISign
         uint160 allowanceAmount = 1 ether;
         IAllowanceTransfer.PermitSingle memory permitSingle = IAllowanceTransfer.PermitSingle({
             details: IAllowanceTransfer.PermitDetails({
-                token: address(erc20Eth), 
-                amount: allowanceAmount, 
-                expiration: uint48(block.timestamp + 1 hours), 
+                token: address(erc20Eth),
+                amount: allowanceAmount,
+                expiration: uint48(block.timestamp + 1 hours),
                 nonce: 0
             }),
             spender: address(this),
@@ -218,19 +223,24 @@ contract ERC7739Test is DelegationHandler, TokenHandler, ERC1271Handler, FFISign
         // Generate the permit2 domain separator and hash
         bytes32 permit2DomainSeparator = permit2.DOMAIN_SEPARATOR();
         bytes32 permitHash = permitSingle.hash();
-        
+
         // Build ERC-7739 TypedDataSign signature for permit2
-        string memory contentsDescr = "PermitDetails(address token,uint160 amount,uint48 expiration,uint48 nonce)PermitSingle(PermitDetails details,address spender,uint256 sigDeadline)PermitSingle";
+        string memory contentsDescr =
+            "PermitDetails(address token,uint160 amount,uint48 expiration,uint48 nonce)PermitSingle(PermitDetails details,address spender,uint256 sigDeadline)PermitSingle";
         (string memory contentsName, string memory contentsType) = mockERC7739Utils.decodeContentsDescr(contentsDescr);
 
         bytes memory signerAccountDomainBytes = IERC5267(address(signerAccount)).toDomainBytes();
-        bytes32 typedDataSignDigest = permitHash.hashTypedDataSign(signerAccountDomainBytes, permit2DomainSeparator, contentsName, contentsType);
+        bytes32 typedDataSignDigest = mockERC7739Utils.hashTypedDataSign(
+            permitHash, signerAccountDomainBytes, permit2DomainSeparator, contentsName, contentsType
+        );
 
         // Sign the digest with the test key
         bytes memory signature = testKey.sign(typedDataSignDigest);
 
         // Build the TypedDataSign signature for ERC-7739
-        bytes memory typedDataSignSignature = TypedDataSignBuilder.buildTypedDataSignSignature(signature, permit2DomainSeparator, permitHash, contentsDescr);
+        bytes memory typedDataSignSignature = TypedDataSignBuilder.buildTypedDataSignSignature(
+            signature, permit2DomainSeparator, permitHash, contentsDescr
+        );
 
         // Wrap the signature with keyHash and empty hook data
         bytes memory wrappedSignature = abi.encode(testKey.toKeyHash(), typedDataSignSignature, bytes(""));
@@ -238,9 +248,10 @@ contract ERC7739Test is DelegationHandler, TokenHandler, ERC1271Handler, FFISign
         // Test by calling permit2.permit() which will internally call isValidSignature() on the signer account
         // This should succeed without reverting, proving the signature is valid
         permit2.permit(address(signerAccount), permitSingle, wrappedSignature);
-        
+
         // Verify the allowance was actually set
-        (uint160 allowance, uint48 expiration, uint48 nonce) = permit2.allowance(address(signerAccount), address(erc20Eth), address(this));
+        (uint160 allowance, uint48 expiration, uint48 nonce) =
+            permit2.allowance(address(signerAccount), address(erc20Eth), address(this));
         assertEq(allowance, allowanceAmount);
         assertEq(expiration, uint48(block.timestamp + 1 hours));
         assertEq(nonce, 1); // nonce should be incremented after permit
@@ -248,7 +259,7 @@ contract ERC7739Test is DelegationHandler, TokenHandler, ERC1271Handler, FFISign
         // Now verify the spender can actually pull the ETH
         address recipient = address(0xBEEF);
         uint160 transferAmount = 0.5 ether;
-        
+
         // Check initial ETH balances
         uint256 signerEthBalanceBefore = address(signerAccount).balance;
         uint256 recipientEthBalanceBefore = recipient.balance;
@@ -262,25 +273,25 @@ contract ERC7739Test is DelegationHandler, TokenHandler, ERC1271Handler, FFISign
         // Verify correct spender cannot exceed allowance limit
         vm.expectRevert(); // Should revert with insufficient allowance
         permit2.transferFrom(address(signerAccount), recipient, allowanceAmount + 1, address(erc20Eth));
-        
+
         // Transfer ETH using the permit
         permit2.transferFrom(address(signerAccount), recipient, transferAmount, address(erc20Eth));
-        
+
         // Verify ETH balances changed correctly
         assertEq(address(signerAccount).balance, signerEthBalanceBefore - transferAmount);
         assertEq(recipient.balance, recipientEthBalanceBefore + transferAmount);
-        
+
         // Verify allowance was decremented
         (uint160 allowanceAfter,,) = permit2.allowance(address(signerAccount), address(erc20Eth), address(this));
         assertEq(allowanceAfter, allowanceAmount - transferAmount);
-        
+
         // Transfer remaining allowed ETH
         permit2.transferFrom(address(signerAccount), recipient, allowanceAmount - transferAmount, address(erc20Eth));
-        
+
         // Verify final ETH balances
         assertEq(address(signerAccount).balance, initialEthBalance - allowanceAmount);
         assertEq(recipient.balance, allowanceAmount);
-        
+
         // Verify allowance is now zero
         (uint160 finalAllowance,,) = permit2.allowance(address(signerAccount), address(erc20Eth), address(this));
         assertEq(finalAllowance, 0);

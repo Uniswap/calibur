@@ -45,15 +45,6 @@ library UserOpBuilder {
         return userOp;
     }
 
-    function withInitCode(PackedUserOperation memory userOp, bytes memory initCode)
-        internal
-        pure
-        returns (PackedUserOperation memory)
-    {
-        userOp.initCode = initCode;
-        return userOp;
-    }
-
     function withCallData(PackedUserOperation memory userOp, bytes memory callData)
         internal
         pure

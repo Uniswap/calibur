@@ -157,12 +157,12 @@ contract CaliburExecuteTest is TokenHandler, HookHandler, ExecuteFixtures, Deleg
         assertEq(tokenB.balanceOf(address(receiver)), 0);
     }
 
-    function test_execute_withSignature_addressZero_invalidSignature_reverts() public {
-        TestKey memory addressZeroKey =
-            TestKey({keyType: KeyType.Secp256k1, publicKey: abi.encode(0, 0), privateKey: uint256(0)});
-
+    function test_execute_withSignature_signatureRecoversToAddressZero_reverts() public {
+        // address(0) keys can no longer be registered, so this exercises the verify() guard directly:
+        // a malformed signature that recovers to address(0) must not validate against a registered key.
+        TestKey memory secp256k1Key = TestKeyManager.initDefault(KeyType.Secp256k1);
         vm.prank(address(signerAccount));
-        signerAccount.register(addressZeroKey.toKey());
+        signerAccount.register(secp256k1Key.toKey());
 
         // Transfer the whole balance of tokenB
         uint256 userBalanceTokenB = tokenB.balanceOf(address(signerAccount));
@@ -174,11 +174,10 @@ contract CaliburExecuteTest is TokenHandler, HookHandler, ExecuteFixtures, Deleg
 
         BatchedCall memory batchedCall = CallUtils.initBatchedCall().withCalls(calls).withRevertOnFailure(true);
         SignedBatchedCall memory signedBatchedCall = CallUtils.initSignedBatchedCall().withBatchedCall(batchedCall)
-            .withNonce(nonce).withKeyHash(addressZeroKey.toKeyHash());
+            .withNonce(nonce).withKeyHash(secp256k1Key.toKeyHash());
 
-        // Use a dummy signature that is at least 64 bytes
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(1234, keccak256("invalidDigest"));
-        bytes memory signature = abi.encodePacked(r, s, v);
+        // r = 0 is an invalid ECDSA signature; recovery returns address(0)
+        bytes memory signature = abi.encodePacked(bytes32(0), bytes32(0), uint8(27));
         bytes memory wrappedSignature = abi.encode(signature, EMPTY_HOOK_DATA);
 
         vm.expectRevert(ICalibur.InvalidSignature.selector);
@@ -261,6 +260,48 @@ contract CaliburExecuteTest is TokenHandler, HookHandler, ExecuteFixtures, Deleg
         vm.prank(caller);
         vm.expectRevert(IKeyManagement.OnlyAdminCanSelfCall.selector);
         signerAccount.execute(batchedCall);
+    }
+
+    function test_execute_batchedCall_nonAdmin_entryPointCall_reverts_withOnlyAdminCanCallEntryPoint() public {
+        TestKey memory secp256k1Key = TestKeyManager.initDefault(KeyType.Secp256k1);
+        // Register key
+        vm.prank(address(signerAccount));
+        signerAccount.register(secp256k1Key.toKey());
+        // Key is not admin, no settings
+
+        Call[] memory calls = CallUtils.initArray();
+        // withdrawTo drains the account's EntryPoint deposit as a zero-value call
+        calls = calls.push(
+            Call(address(entryPoint), 0, abi.encodeWithSelector(entryPoint.withdrawTo.selector, receiver, 0))
+        );
+        BatchedCall memory batchedCall = CallUtils.initBatchedCall().withCalls(calls).withRevertOnFailure(true);
+
+        address caller = abi.decode(secp256k1Key.publicKey, (address));
+        vm.prank(caller);
+        vm.expectRevert(IKeyManagement.OnlyAdminCanCallEntryPoint.selector);
+        signerAccount.execute(batchedCall);
+    }
+
+    function test_execute_batchedCall_admin_entryPointCall_succeeds() public {
+        TestKey memory secp256k1Key = TestKeyManager.initDefault(KeyType.Secp256k1);
+        vm.prank(address(signerAccount));
+        signerAccount.register(secp256k1Key.toKey());
+        vm.prank(address(signerAccount));
+        signerAccount.update(secp256k1Key.toKeyHash(), SettingsBuilder.init().fromIsAdmin(true));
+
+        Call[] memory calls = CallUtils.initArray();
+        calls = calls.push(
+            Call(
+                address(entryPoint), 1e18, abi.encodeWithSelector(entryPoint.depositTo.selector, address(signerAccount))
+            )
+        );
+        BatchedCall memory batchedCall = CallUtils.initBatchedCall().withCalls(calls).withRevertOnFailure(true);
+
+        address caller = abi.decode(secp256k1Key.publicKey, (address));
+        vm.prank(caller);
+        signerAccount.execute(batchedCall);
+
+        assertEq(entryPoint.balanceOf(address(signerAccount)), 1e18);
     }
 
     // Execute can contain a self call which registers a new key even if the caller is untrusted as long as the signature is valid
@@ -997,165 +1038,5 @@ contract CaliburExecuteTest is TokenHandler, HookHandler, ExecuteFixtures, Deleg
         bytes memory wrappedSignature = abi.encode(signature, EMPTY_HOOK_DATA);
         signerAccount.execute(signedBatchedCall, wrappedSignature);
         assertEq(Settings.unwrap(signerAccount.getKeySettings(newKey.toKeyHash())), 0);
-    }
-
-    function test_multicall_succeeds() public {
-        // Create two separate batches of calls
-        Call[] memory calls1 = CallUtils.initArray();
-        Call[] memory calls2 = CallUtils.initArray();
-
-        calls1 = calls1.push(buildTransferCall(address(tokenA), address(receiver), 1e18)); // Transfer 1 tokenA
-        calls2 = calls2.push(buildTransferCall(address(tokenB), address(receiver), 1e18)); // Transfer 1 tokenB
-
-        TestKey memory p256Key1 = TestKeyManager.initDefault(KeyType.P256);
-        TestKey memory p256Key2 = TestKeyManager.initDefault(KeyType.P256);
-
-        vm.startPrank(address(signer));
-        signerAccount.register(p256Key1.toKey());
-        signerAccount.register(p256Key2.toKey());
-        vm.stopPrank();
-
-        // Create signed calls for each batch
-        BatchedCall memory batchedCall1 = CallUtils.initBatchedCall().withCalls(calls1).withRevertOnFailure(true);
-        SignedBatchedCall memory signedBatchedCall1 = CallUtils.initSignedBatchedCall().withBatchedCall(batchedCall1)
-            .withNonce(DEFAULT_NONCE).withKeyHash(p256Key1.toKeyHash());
-        bytes memory signature1 = p256Key1.sign(signerAccount.hashTypedData(signedBatchedCall1.hash()));
-        bytes memory wrappedSignature1 = abi.encode(signature1, EMPTY_HOOK_DATA);
-
-        BatchedCall memory batchedCall2 = CallUtils.initBatchedCall().withCalls(calls2).withRevertOnFailure(true);
-        SignedBatchedCall memory signedBatchedCall2 = CallUtils.initSignedBatchedCall().withBatchedCall(batchedCall2)
-            .withNonce(DEFAULT_NONCE + 1).withKeyHash(p256Key2.toKeyHash());
-        bytes memory signature2 = p256Key2.sign(signerAccount.hashTypedData(signedBatchedCall2.hash()));
-        bytes memory wrappedSignature2 = abi.encode(signature2, EMPTY_HOOK_DATA);
-
-        // Create multicall data
-        bytes[] memory multicallData = new bytes[](2);
-        multicallData[0] = CallUtils.encodeSignedExecuteCall(signedBatchedCall1, wrappedSignature1);
-        multicallData[1] = CallUtils.encodeSignedExecuteCall(signedBatchedCall2, wrappedSignature2);
-
-        // Execute the multicall
-        vm.prank(address(signerAccount));
-        signerAccount.multicall(multicallData);
-
-        // Verify the results
-        assertEq(tokenA.balanceOf(address(receiver)), 1e18);
-        assertEq(tokenB.balanceOf(address(receiver)), 1e18);
-    }
-
-    function test_multicall_rootKey_succeeds() public {
-        // Create two separate batches of calls
-        Call[] memory calls1 = CallUtils.initArray();
-        Call[] memory calls2 = CallUtils.initArray();
-
-        calls1 = calls1.push(buildTransferCall(address(tokenA), address(receiver), 1e18)); // Transfer 1 tokenA
-        calls2 = calls2.push(buildTransferCall(address(tokenB), address(receiver), 1e18)); // Transfer 1 tokenB
-
-        BatchedCall memory batchedCall1 = CallUtils.initBatchedCall().withCalls(calls1).withRevertOnFailure(true);
-        SignedBatchedCall memory signedBatchedCall1 = CallUtils.initSignedBatchedCall().withBatchedCall(batchedCall1)
-            .withNonce(DEFAULT_NONCE).withKeyHash(KeyLib.ROOT_KEY_HASH);
-        bytes32 digest1 = signerAccount.hashTypedData(signedBatchedCall1.hash());
-        bytes memory signature1 = signerTestKey.sign(digest1);
-        bytes memory wrappedSignature1 = abi.encode(signature1, EMPTY_HOOK_DATA);
-
-        BatchedCall memory batchedCall2 = CallUtils.initBatchedCall().withCalls(calls2).withRevertOnFailure(true);
-        SignedBatchedCall memory signedBatchedCall2 = CallUtils.initSignedBatchedCall().withBatchedCall(batchedCall2)
-            .withNonce(DEFAULT_NONCE + 1).withKeyHash(KeyLib.ROOT_KEY_HASH);
-        bytes32 digest2 = signerAccount.hashTypedData(signedBatchedCall2.hash());
-        bytes memory signature2 = signerTestKey.sign(digest2);
-        bytes memory wrappedSignature2 = abi.encode(signature2, EMPTY_HOOK_DATA);
-
-        // Build the mixed multicall data array with two different types of execute calls
-        bytes[] memory multicallData = new bytes[](2);
-        multicallData[0] = CallUtils.encodeSignedExecuteCall(signedBatchedCall1, wrappedSignature1);
-        multicallData[1] = CallUtils.encodeSignedExecuteCall(signedBatchedCall2, wrappedSignature2);
-
-        signerAccount.multicall(multicallData);
-
-        // Verify the results
-        assertEq(tokenA.balanceOf(address(receiver)), 1e18);
-        assertEq(tokenB.balanceOf(address(receiver)), 1e18);
-    }
-
-    function test_multicall_revertsWhenUnauthorized() public {
-        // Create two separate batches of calls
-        Call[] memory calls1 = CallUtils.initArray();
-        Call[] memory calls2 = CallUtils.initArray();
-
-        calls1 = calls1.push(buildTransferCall(address(tokenA), address(receiver), 1e18)); // Transfer 1 tokenA
-        calls2 = calls2.push(buildTransferCall(address(tokenB), address(receiver), 1e18)); // Transfer 1 tokenB
-
-        TestKey memory p256Key1 = TestKeyManager.initDefault(KeyType.P256);
-
-        vm.startPrank(address(signer));
-        signerAccount.register(p256Key1.toKey());
-        vm.stopPrank();
-
-        BatchedCall memory batchedCall1 = CallUtils.initBatchedCall().withCalls(calls1).withRevertOnFailure(true);
-        SignedBatchedCall memory signedBatchedCall1 = CallUtils.initSignedBatchedCall().withBatchedCall(batchedCall1)
-            .withNonce(DEFAULT_NONCE).withKeyHash(p256Key1.toKeyHash());
-        bytes memory signature1 = p256Key1.sign(signerAccount.hashTypedData(signedBatchedCall1.hash()));
-        bytes memory wrappedSignature1 = abi.encode(signature1, EMPTY_HOOK_DATA);
-
-        BatchedCall memory batchedCall2 = CallUtils.initBatchedCall().withCalls(calls2).withRevertOnFailure(true);
-
-        // Build the mixed multicall data array with two different types of execute calls
-        bytes[] memory multicallData = new bytes[](2);
-        multicallData[0] = CallUtils.encodeSignedExecuteCall(signedBatchedCall1, wrappedSignature1);
-        // this call is not signed and caller is not authorized
-        multicallData[1] = CallUtils.encodeBatchedExecuteCall(batchedCall2);
-
-        // The call should revert since we're not authorized to make the second call
-        vm.expectRevert(BaseAuthorization.Unauthorized.selector);
-        signerAccount.multicall(multicallData);
-    }
-
-    /// forge-config: default.isolate = true
-    /// forge-config: ci.isolate = true
-    function test_multicall_gas() public {
-        // Create two separate batches of calls
-        Call[] memory calls1 = CallUtils.initArray();
-        Call[] memory calls2 = CallUtils.initArray();
-
-        calls1 = calls1.push(buildTransferCall(address(tokenA), address(receiver), 1e18)); // Transfer 1 tokenA
-        calls2 = calls2.push(buildTransferCall(address(tokenB), address(receiver), 1e18)); // Transfer 1 tokenB
-
-        TestKey memory p256Key1 = TestKeyManager.initDefault(KeyType.P256);
-        TestKey memory p256Key2 = TestKeyManager.initDefault(KeyType.P256);
-
-        vm.startPrank(address(signer));
-        signerAccount.register(p256Key1.toKey());
-        signerAccount.register(p256Key2.toKey());
-        vm.stopPrank();
-
-        // Create signed calls for each batch
-        BatchedCall memory batchedCall1 = CallUtils.initBatchedCall().withCalls(calls1).withRevertOnFailure(true);
-        SignedBatchedCall memory signedBatchedCall1 = CallUtils.initSignedBatchedCall().withBatchedCall(batchedCall1)
-            .withNonce(DEFAULT_NONCE).withKeyHash(p256Key1.toKeyHash());
-        bytes memory signature1 = p256Key1.sign(signerAccount.hashTypedData(signedBatchedCall1.hash()));
-        bytes memory wrappedSignature1 = abi.encode(signature1, EMPTY_HOOK_DATA);
-        BatchedCall memory batchedCall2 = CallUtils.initBatchedCall().withCalls(calls2).withRevertOnFailure(true);
-        SignedBatchedCall memory signedBatchedCall2 = CallUtils.initSignedBatchedCall().withBatchedCall(batchedCall2)
-            .withNonce(DEFAULT_NONCE + 1).withKeyHash(p256Key2.toKeyHash());
-        bytes memory signature2 = p256Key2.sign(signerAccount.hashTypedData(signedBatchedCall2.hash()));
-        bytes memory wrappedSignature2 = abi.encode(signature2, EMPTY_HOOK_DATA);
-
-        // Create multicall data using the new utility function
-        SignedBatchedCall[] memory signedBatchedCalls = new SignedBatchedCall[](2);
-        signedBatchedCalls[0] = signedBatchedCall1;
-        signedBatchedCalls[1] = signedBatchedCall2;
-
-        bytes[] memory signatures = new bytes[](2);
-        signatures[0] = signature1;
-        signatures[1] = signature2;
-
-        // Create multicall data
-        bytes[] memory multicallData = new bytes[](2);
-        multicallData[0] = CallUtils.encodeSignedExecuteCall(signedBatchedCall1, wrappedSignature1);
-        multicallData[1] = CallUtils.encodeSignedExecuteCall(signedBatchedCall2, wrappedSignature2);
-
-        // Execute the multicall
-        vm.prank(address(signerAccount));
-        signerAccount.multicall(multicallData);
-        vm.snapshotGasLastCall("multicall");
     }
 }

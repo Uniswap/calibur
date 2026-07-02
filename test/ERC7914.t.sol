@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 
+import {Vm} from "forge-std/Vm.sol";
 import {DelegationHandler} from "./utils/DelegationHandler.sol";
 import {IERC7914} from "../src/interfaces/IERC7914.sol";
 import {ERC7914} from "../src/ERC7914.sol";
 import {BaseAuthorization} from "../src/BaseAuthorization.sol";
 import {IPermit2} from "../lib/permit2/src/interfaces/IPermit2.sol";
 import {ISignatureTransfer} from "../lib/permit2/src/interfaces/ISignatureTransfer.sol";
-import {ERC20ETH} from "../lib/erc20-eth/src/ERC20Eth.sol";
+import {ERC20ETH} from "../lib/erc20-eth/src/ERC20ETH.sol";
 import {IAllowanceTransfer} from "../lib/permit2/src/interfaces/IAllowanceTransfer.sol";
 import {Permit2Utils} from "./utils/Permit2Utils.sol";
 import {TestKeyManager, TestKey} from "./utils/TestKeyManager.sol";
@@ -25,12 +26,13 @@ contract ERC7914Test is DelegationHandler, ERC1271Handler, FFISignTypedData {
 
     event TransferFromNative(address indexed from, address indexed to, uint256 value);
     event ApproveNative(address indexed owner, address indexed spender, uint256 value);
-    event ApproveNativeTransient(address indexed owner, address indexed spender, uint256 value);
-    event TransferFromNativeTransient(address indexed from, address indexed to, uint256 value);
     event NativeAllowanceUpdated(address indexed spender, uint256 value);
 
     address bob = makeAddr("bob");
     address recipient = makeAddr("recipient");
+
+    /// @dev Must match the canonical address hardcoded in ERC7914.ERC20ETH
+    address constant ERC20ETH_ADDR = 0x00000000e20E49e6dCeE6e8283A0C090578F0fb9;
 
     struct Permit2TestSetup {
         ERC20ETH erc20Eth;
@@ -44,18 +46,19 @@ contract ERC7914Test is DelegationHandler, ERC1271Handler, FFISignTypedData {
         setup.permit2 = IPermit2(Permit2Utils.deployPermit2());
         setup.spendAmount = 1 ether;
         setup.totalAmount = 2 ether;
-        
+
         vm.deal(address(signerAccount), setup.totalAmount);
         vm.prank(address(signerAccount));
         signerAccount.approveNative(address(setup.erc20Eth), type(uint256).max);
     }
 
-    function _createPermit(address token, uint256 amount) internal view returns (ISignatureTransfer.PermitTransferFrom memory) {
+    function _createPermit(address token, uint256 amount)
+        internal
+        view
+        returns (ISignatureTransfer.PermitTransferFrom memory)
+    {
         return ISignatureTransfer.PermitTransferFrom({
-            permitted: ISignatureTransfer.TokenPermissions({
-                token: token,
-                amount: amount
-            }),
+            permitted: ISignatureTransfer.TokenPermissions({token: token, amount: amount}),
             nonce: 0,
             deadline: block.timestamp + 1 hours
         });
@@ -72,30 +75,28 @@ contract ERC7914Test is DelegationHandler, ERC1271Handler, FFISignTypedData {
         string memory witnessTypeString
     ) internal {
         // Test invalid transfer (too much)
-        ISignatureTransfer.SignatureTransferDetails memory invalidTransfer = 
-            ISignatureTransfer.SignatureTransferDetails({
-                to: bob,
-                requestedAmount: spendAmount + 1
-            });
+        ISignatureTransfer.SignatureTransferDetails memory invalidTransfer =
+            ISignatureTransfer.SignatureTransferDetails({to: bob, requestedAmount: spendAmount + 1});
 
         vm.expectRevert(abi.encodeWithSelector(ISignatureTransfer.InvalidAmount.selector, spendAmount));
         vm.prank(bob);
         if (isWitness) {
-            permit2.permitWitnessTransferFrom(permit, invalidTransfer, address(signerAccount), witness, witnessTypeString, sig);
+            permit2.permitWitnessTransferFrom(
+                permit, invalidTransfer, address(signerAccount), witness, witnessTypeString, sig
+            );
         } else {
             permit2.permitTransferFrom(permit, invalidTransfer, address(signerAccount), sig);
         }
 
         // Test valid transfer
-        ISignatureTransfer.SignatureTransferDetails memory validTransfer = 
-            ISignatureTransfer.SignatureTransferDetails({
-                to: bob,
-                requestedAmount: spendAmount
-            });
-        
+        ISignatureTransfer.SignatureTransferDetails memory validTransfer =
+            ISignatureTransfer.SignatureTransferDetails({to: bob, requestedAmount: spendAmount});
+
         vm.prank(bob);
         if (isWitness) {
-            permit2.permitWitnessTransferFrom(permit, validTransfer, address(signerAccount), witness, witnessTypeString, sig);
+            permit2.permitWitnessTransferFrom(
+                permit, validTransfer, address(signerAccount), witness, witnessTypeString, sig
+            );
         } else {
             permit2.permitTransferFrom(permit, validTransfer, address(signerAccount), sig);
         }
@@ -226,116 +227,6 @@ contract ERC7914Test is DelegationHandler, ERC1271Handler, FFISignTypedData {
         }
     }
 
-    function test_approveNativeTransient_revertsWithUnauthorized() public {
-        vm.expectRevert(BaseAuthorization.Unauthorized.selector);
-        signerAccount.approveNativeTransient(bob, 1 ether);
-    }
-
-    function test_approveNativeTransient_succeeds() public {
-        vm.expectEmit(true, true, false, true);
-        emit ApproveNativeTransient(address(signerAccount), bob, 1 ether);
-        vm.startPrank(address(signerAccount));
-        bool success = signerAccount.approveNativeTransient(bob, 1 ether);
-        assertTrue(success);
-        assertEq(signerAccount.transientNativeAllowance(bob), 1 ether);
-    }
-
-    /// forge-config: default.isolate = true
-    /// forge-config: ci.isolate = true
-    function test_approveNativeTransient_gas() public {
-        vm.expectEmit(true, true, false, true);
-        emit ApproveNativeTransient(address(signerAccount), bob, 1 ether);
-        vm.startPrank(address(signerAccount));
-        signerAccount.approveNativeTransient(bob, 1 ether);
-        vm.snapshotGasLastCall("approveNativeTransient");
-    }
-
-    function test_transferFromNativeTransient_revertsWithIncorrectSender() public {
-        vm.expectRevert(IERC7914.IncorrectSender.selector);
-        signerAccount.transferFromNativeTransient(bob, recipient, 1 ether);
-    }
-
-    function test_transferFromNativeTransient_revertsWithAllowanceExceeded() public {
-        vm.prank(address(signerAccount));
-        bool success = signerAccount.approveNativeTransient(bob, 1 ether);
-        assertTrue(success);
-        vm.prank(bob);
-        vm.expectRevert(IERC7914.AllowanceExceeded.selector);
-        signerAccount.transferFromNativeTransient(address(signerAccount), bob, 2 ether);
-    }
-
-    function test_transferFromNativeTransient_zeroAmount_returnsTrue() public {
-        vm.prank(address(signerAccount));
-        bool success = signerAccount.approveNativeTransient(bob, 1 ether);
-        assertTrue(success);
-        success = signerAccount.transferFromNativeTransient(address(signerAccount), bob, 0);
-        assertEq(success, true);
-    }
-
-    function test_transferFromNativeTransient_succeeds() public {
-        // send eth to signerAccount
-        vm.deal(address(signerAccount), 1 ether);
-
-        vm.prank(address(signerAccount));
-        bool success = signerAccount.approveNativeTransient(bob, 1 ether);
-        assertTrue(success);
-
-        uint256 bobBalanceBefore = bob.balance;
-        uint256 signerAccountBalanceBefore = address(signerAccount).balance;
-
-        vm.expectEmit(true, true, false, true);
-        emit TransferFromNativeTransient(address(signerAccount), bob, 1 ether);
-
-        vm.prank(bob);
-        success = signerAccount.transferFromNativeTransient(address(signerAccount), bob, 1 ether);
-        assertTrue(success);
-
-        assertEq(signerAccount.transientNativeAllowance(bob), 0);
-        assertEq(bob.balance, bobBalanceBefore + 1 ether);
-        assertEq(address(signerAccount).balance, signerAccountBalanceBefore - 1 ether);
-    }
-
-    function test_fuzz_transferFromNativeTransient_succeeds(
-        uint256 balance,
-        uint256 approvedAmount,
-        uint256 transferAmount
-    ) public {
-        // ensure there are funds in the signerAccount
-        vm.deal(address(signerAccount), balance);
-        vm.prank(address(signerAccount));
-        bool success = signerAccount.approveNativeTransient(bob, approvedAmount);
-        assertEq(signerAccount.transientNativeAllowance(bob), approvedAmount);
-        assertTrue(success);
-
-        uint256 bobBalanceBefore = bob.balance;
-        uint256 signerAccountBalanceBefore = address(signerAccount).balance;
-
-        vm.prank(bob);
-        // Check if the transfer amount is greater than the approved amount or the balance of the signerAccount
-        // and expect the appropriate revert
-        if (transferAmount > approvedAmount) {
-            vm.expectRevert(IERC7914.AllowanceExceeded.selector);
-        } else if (transferAmount > address(signerAccount).balance) {
-            vm.expectRevert(IERC7914.TransferNativeFailed.selector);
-        }
-        success = signerAccount.transferFromNativeTransient(address(signerAccount), bob, transferAmount);
-        // if the transfer was successful, check the balances have updated
-        // otherwise check the balances have not changed
-        if (success) {
-            if (approvedAmount < type(uint256).max) {
-                assertEq(signerAccount.transientNativeAllowance(bob), approvedAmount - transferAmount);
-            } else {
-                assertEq(signerAccount.transientNativeAllowance(bob), approvedAmount);
-            }
-            assertEq(bob.balance, bobBalanceBefore + transferAmount);
-            assertEq(address(signerAccount).balance, signerAccountBalanceBefore - transferAmount);
-        } else {
-            assertEq(signerAccount.transientNativeAllowance(bob), approvedAmount);
-            assertEq(bob.balance, bobBalanceBefore);
-            assertEq(address(signerAccount).balance, signerAccountBalanceBefore);
-        }
-    }
-
     // Test that a permit2 signature can be used to transfer native ETH
     // using the ERC20-eth contract
     function test_permit2SignatureTransferNative() public {
@@ -343,13 +234,161 @@ contract ERC7914Test is DelegationHandler, ERC1271Handler, FFISignTypedData {
         ISignatureTransfer.PermitTransferFrom memory permit = _createPermit(address(setup.erc20Eth), setup.spendAmount);
 
         bytes memory sig;
-        {        
-            (bytes32 appDomainSeparator, , bytes32 contentsHash) = Permit2Utils.getPermit2Fixtures(permit, bob, address(setup.permit2));
-        
+        {
+            (bytes32 appDomainSeparator,, bytes32 contentsHash) =
+                Permit2Utils.getPermit2Fixtures(permit, bob, address(setup.permit2));
+
             bytes32 msgHash = MessageHashUtils.toTypedDataHash(appDomainSeparator, contentsHash);
             sig = signerTestKey.sign(msgHash);
         }
         _testPermit2Transfer(setup.permit2, permit, sig, setup.spendAmount, setup.totalAmount, false, bytes32(0), "");
+    }
+
+    function test_nativeAllowance_erc20ETH_defaultsToMax() public view {
+        // No approveNative call has ever been made on the delegated account
+        assertEq(signerAccount.nativeAllowance(ERC20ETH_ADDR), type(uint256).max);
+    }
+
+    function test_transferFromNative_erc20ETH_succeedsWithoutApproval() public {
+        vm.deal(address(signerAccount), 1 ether);
+        uint256 recipientBalanceBefore = recipient.balance;
+
+        // No NativeAllowanceUpdated event should be emitted since the default approval
+        // is never decremented
+        vm.expectEmit(true, true, false, true);
+        emit TransferFromNative(address(signerAccount), recipient, 1 ether);
+
+        // ERC20ETH pulls native ETH without any prior approveNative call
+        vm.prank(ERC20ETH_ADDR);
+        bool success = signerAccount.transferFromNative(address(signerAccount), recipient, 1 ether);
+
+        assertTrue(success);
+        assertEq(recipient.balance, recipientBalanceBefore + 1 ether);
+        assertEq(address(signerAccount).balance, 0);
+        // Allowance remains max, it is never consumed
+        assertEq(signerAccount.nativeAllowance(ERC20ETH_ADDR), type(uint256).max);
+    }
+
+    function test_transferFromNative_erc20ETH_allowanceNotDecremented() public {
+        vm.deal(address(signerAccount), 5 ether);
+
+        vm.recordLogs();
+        vm.startPrank(ERC20ETH_ADDR);
+        signerAccount.transferFromNative(address(signerAccount), recipient, 1 ether);
+        signerAccount.transferFromNative(address(signerAccount), recipient, 2 ether);
+        vm.stopPrank();
+
+        // Repeated transfers all succeed and the allowance is still max
+        assertEq(recipient.balance, 3 ether);
+        assertEq(signerAccount.nativeAllowance(ERC20ETH_ADDR), type(uint256).max);
+
+        // Assert NativeAllowanceUpdated was never emitted for the default approval
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bytes32 updatedTopic = keccak256("NativeAllowanceUpdated(address,uint256)");
+        for (uint256 i = 0; i < logs.length; ++i) {
+            assertTrue(logs[i].topics[0] != updatedTopic);
+        }
+    }
+
+    /// @dev approveNative on ERC20ETH overrides the default unlimited allowance
+    function test_approveNative_erc20ETH_overridesDefault() public {
+        vm.expectEmit(true, true, false, true);
+        emit ApproveNative(address(signerAccount), ERC20ETH_ADDR, 1 ether);
+        vm.prank(address(signerAccount));
+        bool success = signerAccount.approveNative(ERC20ETH_ADDR, 1 ether);
+        assertTrue(success);
+
+        // The override replaces the default max and is now consumed on transfer
+        assertEq(signerAccount.nativeAllowance(ERC20ETH_ADDR), 1 ether);
+    }
+
+    /// @dev Once overridden, an ERC20ETH allowance is decremented like any other spender
+    function test_transferFromNative_erc20ETH_overriddenAllowance_decrements() public {
+        vm.deal(address(signerAccount), 2 ether);
+        vm.prank(address(signerAccount));
+        signerAccount.approveNative(ERC20ETH_ADDR, 1 ether);
+
+        vm.expectEmit(true, true, false, true);
+        emit NativeAllowanceUpdated(ERC20ETH_ADDR, 0);
+        vm.prank(ERC20ETH_ADDR);
+        signerAccount.transferFromNative(address(signerAccount), recipient, 1 ether);
+
+        assertEq(recipient.balance, 1 ether);
+        assertEq(signerAccount.nativeAllowance(ERC20ETH_ADDR), 0);
+
+        // Further pulls revert now that the overridden allowance is exhausted
+        vm.prank(ERC20ETH_ADDR);
+        vm.expectRevert(IERC7914.AllowanceExceeded.selector);
+        signerAccount.transferFromNative(address(signerAccount), recipient, 1 ether);
+    }
+
+    /// @dev Overriding the allowance to 0 revokes ERC20ETH's ability to pull native ETH
+    function test_approveNative_erc20ETH_revoke() public {
+        vm.deal(address(signerAccount), 1 ether);
+
+        vm.prank(address(signerAccount));
+        signerAccount.approveNative(ERC20ETH_ADDR, 0);
+        assertEq(signerAccount.nativeAllowance(ERC20ETH_ADDR), 0);
+
+        vm.prank(ERC20ETH_ADDR);
+        vm.expectRevert(IERC7914.AllowanceExceeded.selector);
+        signerAccount.transferFromNative(address(signerAccount), recipient, 1 ether);
+
+        assertEq(address(signerAccount).balance, 1 ether);
+    }
+
+    /// @dev An overridden ERC20ETH allowance behaves exactly like a normal spender allowance
+    function test_fuzz_approveNative_erc20ETH_override(uint256 balance, uint256 approvedAmount, uint256 transferAmount)
+        public
+    {
+        vm.deal(address(signerAccount), balance);
+        vm.prank(address(signerAccount));
+        signerAccount.approveNative(ERC20ETH_ADDR, approvedAmount);
+        assertEq(signerAccount.nativeAllowance(ERC20ETH_ADDR), approvedAmount);
+
+        uint256 recipientBalanceBefore = recipient.balance;
+        uint256 signerAccountBalanceBefore = address(signerAccount).balance;
+
+        vm.prank(ERC20ETH_ADDR);
+        if (transferAmount > approvedAmount) {
+            vm.expectRevert(IERC7914.AllowanceExceeded.selector);
+        } else if (transferAmount > address(signerAccount).balance) {
+            vm.expectRevert(IERC7914.TransferNativeFailed.selector);
+        }
+        bool success = signerAccount.transferFromNative(address(signerAccount), recipient, transferAmount);
+
+        if (success) {
+            if (approvedAmount < type(uint256).max) {
+                assertEq(signerAccount.nativeAllowance(ERC20ETH_ADDR), approvedAmount - transferAmount);
+            } else {
+                assertEq(signerAccount.nativeAllowance(ERC20ETH_ADDR), approvedAmount);
+            }
+            assertEq(recipient.balance, recipientBalanceBefore + transferAmount);
+            assertEq(address(signerAccount).balance, signerAccountBalanceBefore - transferAmount);
+        } else {
+            assertEq(signerAccount.nativeAllowance(ERC20ETH_ADDR), approvedAmount);
+            assertEq(recipient.balance, recipientBalanceBefore);
+            assertEq(address(signerAccount).balance, signerAccountBalanceBefore);
+        }
+    }
+
+    function test_fuzz_transferFromNative_erc20ETH(uint256 balance, uint256 transferAmount) public {
+        vm.deal(address(signerAccount), balance);
+        uint256 recipientBalanceBefore = recipient.balance;
+
+        vm.prank(ERC20ETH_ADDR);
+        // No approval needed, only the balance constrains the transfer
+        if (transferAmount > balance) {
+            vm.expectRevert(IERC7914.TransferNativeFailed.selector);
+        }
+        bool success = signerAccount.transferFromNative(address(signerAccount), recipient, transferAmount);
+
+        if (success) {
+            assertEq(recipient.balance, recipientBalanceBefore + transferAmount);
+            assertEq(address(signerAccount).balance, balance - transferAmount);
+        }
+        // Allowance is always max regardless of transfers
+        assertEq(signerAccount.nativeAllowance(ERC20ETH_ADDR), type(uint256).max);
     }
 
     // Test that a permit2 witness signature can be used to transfer native ETH
@@ -359,14 +398,24 @@ contract ERC7914Test is DelegationHandler, ERC1271Handler, FFISignTypedData {
         Permit2Utils.MockWitness memory witnessData = Permit2Utils.MockWitness(10000000, address(5), true);
         bytes32 witness = keccak256(abi.encode(witnessData));
         ISignatureTransfer.PermitTransferFrom memory permit = _createPermit(address(setup.erc20Eth), setup.spendAmount);
-        
+
         bytes memory sig;
-        {        
-            (bytes32 appDomainSeparator, , bytes32 contentsHash) = Permit2Utils.getPermit2WitnessFixtures(permit, witness, bob, address(setup.permit2));
-        
+        {
+            (bytes32 appDomainSeparator,, bytes32 contentsHash) =
+                Permit2Utils.getPermit2WitnessFixtures(permit, witness, bob, address(setup.permit2));
+
             bytes32 msgHash = MessageHashUtils.toTypedDataHash(appDomainSeparator, contentsHash);
             sig = signerTestKey.sign(msgHash);
         }
-        _testPermit2Transfer(setup.permit2, permit, sig, setup.spendAmount, setup.totalAmount, true, witness, Permit2Utils.WITNESS_TYPE_STRING);
+        _testPermit2Transfer(
+            setup.permit2,
+            permit,
+            sig,
+            setup.spendAmount,
+            setup.totalAmount,
+            true,
+            witness,
+            Permit2Utils.WITNESS_TYPE_STRING
+        );
     }
 }
