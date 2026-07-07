@@ -1,12 +1,15 @@
 # Calibur
-[Git Source](https://github.com/Uniswap/minimal-delegation/blob/8189d62a80ed3ac2bd308849641dca52350f024a/src/Calibur.sol)
+[Git Source](https://github.com/Uniswap/calibur/blob/249cac5e880831d7b2de4111a5920dbf0d242846/src/Calibur.sol)
 
 **Inherits:**
-[ICalibur](/src/interfaces/ICalibur.sol/interface.ICalibur.md), [ERC7821](/src/ERC7821.sol/abstract.ERC7821.md), [ERC1271](/src/ERC1271.sol/abstract.ERC1271.md), [ERC4337Account](/src/ERC4337Account.sol/abstract.ERC4337Account.md), [KeyManagement](/src/KeyManagement.sol/abstract.KeyManagement.md), [NonceManager](/src/NonceManager.sol/abstract.NonceManager.md), [ERC7914](/src/ERC7914.sol/abstract.ERC7914.md), [ERC7201](/src/ERC7201.sol/contract.ERC7201.md), [ERC7739](/src/ERC7739.sol/abstract.ERC7739.md), [EIP712](/src/EIP712.sol/contract.EIP712.md), [Multicall](/src/Multicall.sol/abstract.Multicall.md), Receiver
+[ICalibur](/src/interfaces/ICalibur.sol/interface.ICalibur.md), [ERC7821](/src/ERC7821.sol/abstract.ERC7821.md), [ERC1271](/src/ERC1271.sol/abstract.ERC1271.md), [ERC4337Account](/src/ERC4337Account.sol/abstract.ERC4337Account.md), [KeyManagement](/src/KeyManagement.sol/abstract.KeyManagement.md), [NonceManager](/src/NonceManager.sol/abstract.NonceManager.md), [ERC7914](/src/ERC7914.sol/abstract.ERC7914.md), [ERC7201](/src/ERC7201.sol/contract.ERC7201.md), [ERC7739](/src/ERC7739.sol/abstract.ERC7739.md), [EIP712](/src/EIP712.sol/contract.EIP712.md), Receiver
+
+**Title:**
+Calibur
 
 A singleton contract wallet supporting batched transactions, alternative signers, and native ETH transferFrom
 
-*Delegate to Calibur from an EOA using EIP-7702*
+Delegate to Calibur from an EOA using EIP-7702
 
 **Note:**
 security-contact: security@uniswap.org
@@ -17,7 +20,7 @@ security-contact: security@uniswap.org
 
 Execute entrypoint for trusted callers
 
-*This function is only callable by this account or an admin key*
+This function is only callable by this account or an admin key
 
 
 ```solidity
@@ -32,9 +35,7 @@ function execute(BatchedCall memory batchedCall) public payable;
 
 ### execute
 
-Execute entrypoint for trusted callers
-
-*This function is only callable by this account or an admin key*
+Execute entrypoint for relayed batched calls
 
 
 ```solidity
@@ -44,13 +45,13 @@ function execute(SignedBatchedCall calldata signedBatchedCall, bytes calldata wr
 
 |Name|Type|Description|
 |----|----|-----------|
-|`signedBatchedCall`|`SignedBatchedCall`||
-|`wrappedSignature`|`bytes`||
+|`signedBatchedCall`|`SignedBatchedCall`|The signed batched call to execute|
+|`wrappedSignature`|`bytes`|The signature along with any optional hook data, equivalent to abi.encode(bytes, bytes)|
 
 
 ### execute
 
-*Executes a batched call.*
+Executes a batched call.
 
 
 ```solidity
@@ -66,10 +67,12 @@ function execute(bytes32 mode, bytes calldata executionData) external payable ov
 
 ### executeUserOp
 
-*This function is executeable only by the EntryPoint contract, and is the main pathway for UserOperations to be executed.
+This function is executeable only by the EntryPoint contract, and is the main pathway for UserOperations to be executed.
+
 UserOperations can be executed through the execute function, but another method of authorization (ie through a passed in signature) is required.
-userOp.callData is abi.encodeCall(IAccountExecute.executeUserOp.selector, (abi.encode(Call[]), bool))
-Note that this contract is only compatible with Entrypoint versions v0.7.0 and v0.8.0. It is not compatible with v0.6.0, as that version does not support the "executeUserOp" selector.*
+`userOp.callData` is `abi.encodeCall(IAccountExecute.executeUserOp.selector, (abi.encode(Call[]), bool))`
+Note that this contract is only compatible with Entrypoint versions v0.7.0 and v0.8.0.
+It is not compatible with v0.6.0, as that version does not support the "executeUserOp" selector.
 
 
 ```solidity
@@ -84,8 +87,8 @@ signature failure should be reported by returning SIG_VALIDATION_FAILED (1).
 This allows making a "simulation call" without a valid signature
 Other failures (e.g. nonce mismatch, or invalid signature format) should still revert to signal failure.
 
-*Only return validationData if the signature from the key associated with `keyHash` is valid over the userOpHash
-- The ERC-4337 spec requires that `validateUserOp` does not early return if the signature is invalid such that accurate gas estimation can be done*
+Only return validationData if the signature from the key associated with `keyHash` is valid over the userOpHash
+- The ERC-4337 spec requires that `validateUserOp` does not early return if the signature is invalid such that accurate gas estimation can be done
 
 
 ```solidity
@@ -120,9 +123,18 @@ function isValidSignature(bytes32 digest, bytes calldata wrappedSignature)
     returns (bytes4);
 ```
 
+### _checkCanRegister
+
+Prevent registering protected addresses as keys on the account
+
+
+```solidity
+function _checkCanRegister(Key memory key) internal view override;
+```
+
 ### _processBatch
 
-*Iterates through calls, reverting according to specified failure mode*
+Iterates through calls, reverting according to specified failure mode
 
 
 ```solidity
@@ -131,7 +143,7 @@ function _processBatch(BatchedCall memory batchedCall, bytes32 keyHash) private;
 
 ### _process
 
-*Executes a low level call using execution hooks if set*
+Executes a low level call using execution hooks if set
 
 
 ```solidity
@@ -140,7 +152,7 @@ function _process(Call memory _call, bytes32 keyHash) private returns (bool succ
 
 ### _handleVerifySignature
 
-*This function is used to handle the verification of signatures sent through execute()*
+This function is used to handle the verification of signatures sent through execute()
 
 
 ```solidity

@@ -1,8 +1,11 @@
 # NonceManager
-[Git Source](https://github.com/Uniswap/minimal-delegation/blob/8189d62a80ed3ac2bd308849641dca52350f024a/src/NonceManager.sol)
+[Git Source](https://github.com/Uniswap/calibur/blob/249cac5e880831d7b2de4111a5920dbf0d242846/src/NonceManager.sol)
 
 **Inherits:**
 [INonceManager](/src/interfaces/INonceManager.sol/interface.INonceManager.md), [BaseAuthorization](/src/BaseAuthorization.sol/contract.BaseAuthorization.md)
+
+**Title:**
+NonceManager
 
 A contract that manages nonces to prevent replay attacks
 
@@ -11,7 +14,7 @@ A contract that manages nonces to prevent replay attacks
 ### nonceSequenceNumber
 
 ```solidity
-mapping(uint256 key => uint256 seq) public nonceSequenceNumber;
+mapping(uint256 key => uint256 seq) public nonceSequenceNumber
 ```
 
 
@@ -56,7 +59,7 @@ function getSeq(uint256 key) external view override returns (uint256 seq);
 
 Validates that the provided nonce is valid and increments the sequence number
 
-*If valid, increments the sequence number for future nonce validations*
+If valid, increments the sequence number for future nonce validations
 
 
 ```solidity

@@ -1,5 +1,5 @@
 # IGuardedExecutorHook
-[Git Source](https://github.com/Uniswap/minimal-delegation/blob/8189d62a80ed3ac2bd308849641dca52350f024a/src/hooks/example/GuardedExecutorHook.sol)
+[Git Source](https://github.com/Uniswap/calibur/blob/249cac5e880831d7b2de4111a5920dbf0d242846/src/hooks/example/GuardedExecutorHook.sol)
 
 **Inherits:**
 [IExecutionHook](/src/interfaces/IExecutionHook.sol/interface.IExecutionHook.md)
@@ -37,7 +37,7 @@ function ANY_FN_SEL() external view returns (bytes4);
 
 Set the canExecute flag for a keyHash, to, and selector.
 
-*Note that this hook does not support restricting any `value` sent along with the call*
+Note that this hook does not support restricting any `value` sent along with the call
 
 
 ```solidity

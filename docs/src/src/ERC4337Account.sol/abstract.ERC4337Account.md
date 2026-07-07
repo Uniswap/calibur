@@ -1,8 +1,11 @@
 # ERC4337Account
-[Git Source](https://github.com/Uniswap/minimal-delegation/blob/8189d62a80ed3ac2bd308849641dca52350f024a/src/ERC4337Account.sol)
+[Git Source](https://github.com/Uniswap/calibur/blob/249cac5e880831d7b2de4111a5920dbf0d242846/src/ERC4337Account.sol)
 
 **Inherits:**
 [IERC4337Account](/src/interfaces/IERC4337Account.sol/interface.IERC4337Account.md), [BaseAuthorization](/src/BaseAuthorization.sol/contract.BaseAuthorization.md)
+
+**Title:**
+ERC4337Account
 
 A base contract which allows for the entrypoint to have a default value that can be updated
 
@@ -13,14 +16,14 @@ ERC-4337 defined constants
 
 
 ```solidity
-uint256 internal constant SIG_VALIDATION_SUCCEEDED = 0;
+uint256 internal constant SIG_VALIDATION_SUCCEEDED = 0
 ```
 
 
 ### SIG_VALIDATION_FAILED
 
 ```solidity
-uint256 internal constant SIG_VALIDATION_FAILED = 1;
+uint256 internal constant SIG_VALIDATION_FAILED = 1
 ```
 
 
@@ -29,7 +32,7 @@ The cached entrypoint address
 
 
 ```solidity
-uint256 internal _CACHED_ENTRYPOINT;
+uint256 internal _CACHED_ENTRYPOINT
 ```
 
 
@@ -38,14 +41,14 @@ uint256 internal _CACHED_ENTRYPOINT;
 
 
 ```solidity
-modifier onlyEntryPoint();
+modifier onlyEntryPoint() ;
 ```
 
 ### updateEntryPoint
 
 Updates the EntryPoint address
 
-*4337 support is enabled by default, so this must be called with address(0) in order to disable it.*
+4337 support is enabled by default, so this must be called with address(0) in order to disable it.
 
 
 ```solidity

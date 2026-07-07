@@ -1,54 +1,57 @@
 # EIP712
-[Git Source](https://github.com/Uniswap/minimal-delegation/blob/8189d62a80ed3ac2bd308849641dca52350f024a/src/EIP712.sol)
+[Git Source](https://github.com/Uniswap/calibur/blob/249cac5e880831d7b2de4111a5920dbf0d242846/src/EIP712.sol)
 
 **Inherits:**
 [IEIP712](/src/interfaces/IEIP712.sol/interface.IEIP712.md), IERC5267, [BaseAuthorization](/src/BaseAuthorization.sol/contract.BaseAuthorization.md)
 
+**Title:**
+EIP712
+
 It is not compatible with use by proxy contracts since the domain name and version are cached on deployment.
 
-*This contract does not cache the domain separator and instead calculates it on the fly
-since it will change when delegated to or when the salt is updated.*
+This contract does not cache the domain separator and instead calculates it on the fly
+since it will change when delegated to or when the salt is updated.
 
 
 ## State Variables
 ### _DOMAIN_TYPEHASH
-*`keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract,bytes32 salt)")`.*
+`keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract,bytes32 salt)")`.
 
 
 ```solidity
-bytes32 internal constant _DOMAIN_TYPEHASH = 0xd87cd6ef79d4e2b95e15ce8abf732db51ec771f1ca2edccf22a46c729ac56472;
+bytes32 internal constant _DOMAIN_TYPEHASH = 0xd87cd6ef79d4e2b95e15ce8abf732db51ec771f1ca2edccf22a46c729ac56472
 ```
 
 
 ### _cachedNameHash
-*Cached name and version hashes for cheaper runtime gas costs.*
+Cached name and version hashes for cheaper runtime gas costs.
 
 
 ```solidity
-bytes32 private immutable _cachedNameHash;
+bytes32 private immutable _cachedNameHash
 ```
 
 
 ### _cachedVersionHash
 
 ```solidity
-bytes32 private immutable _cachedVersionHash;
+bytes32 private immutable _cachedVersionHash
 ```
 
 
 ### _cachedImplementation
 
 ```solidity
-address private immutable _cachedImplementation;
+address private immutable _cachedImplementation
 ```
 
 
 ### _saltPrefix
-*Any prefix to be added to the salt. This can be updated by the owner or an admin but it defaults to 0.*
+Any prefix to be added to the salt. This can be updated by the owner or an admin but it defaults to 0.
 
 
 ```solidity
-uint96 private _saltPrefix;
+uint96 private _saltPrefix
 ```
 
 
@@ -57,14 +60,14 @@ uint96 private _saltPrefix;
 
 
 ```solidity
-constructor();
+constructor() ;
 ```
 
 ### eip712Domain
 
 Returns information about the `EIP712Domain` used to create EIP-712 compliant hashes.
 
-*Follows ERC-5267 (see https://eips.ethereum.org/EIPS/eip-5267).*
+Follows ERC-5267 (see https://eips.ethereum.org/EIPS/eip-5267).
 
 
 ```solidity
@@ -99,7 +102,7 @@ function eip712Domain()
 
 Encode the EIP-5267 domain into bytes
 
-*for use in ERC-7739*
+for use in ERC-7739
 
 
 ```solidity
@@ -138,22 +141,16 @@ function hashTypedData(bytes32 hash) public view virtual returns (bytes32);
 
 ### updateSalt
 
-Update the EIP-712 domain salt by setting the upper 96 bits to `prefix`
+Increment the EIP-712 domain salt prefix, the upper 96 bits of the salt
 12 bytes | 20 bytes
 prefix   | Implementation address (immutable, set on deployment)
 
-*Use this to invalidate existing signatures signed under the old domain separator*
+Use this to invalidate existing signatures signed under the old domain separator.
 
 
 ```solidity
-function updateSalt(uint96 prefix) external onlyThis;
+function updateSalt() external onlyThis;
 ```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`prefix`|`uint96`|The prefix to set|
-
 
 ### _domainNameAndVersion
 

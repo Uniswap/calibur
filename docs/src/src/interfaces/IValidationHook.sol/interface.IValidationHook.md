@@ -1,10 +1,13 @@
 # IValidationHook
-[Git Source](https://github.com/Uniswap/minimal-delegation/blob/8189d62a80ed3ac2bd308849641dca52350f024a/src/interfaces/IValidationHook.sol)
+[Git Source](https://github.com/Uniswap/calibur/blob/249cac5e880831d7b2de4111a5920dbf0d242846/src/interfaces/IValidationHook.sol)
+
+**Title:**
+IValidationHook
 
 Hook interface for optional signature validation logic
 
-*The keyHash is validated against the signature before each hook is called, but
-the hookData is NOT signed over or validated within the account. It MUST be treated as unsafe and can be set by anybody.*
+The keyHash is validated against the signature before each hook is called, but
+the hookData is NOT signed over or validated within the account. It MUST be treated as unsafe and can be set by anybody.
 
 
 ## Functions
@@ -12,7 +15,7 @@ the hookData is NOT signed over or validated within the account. It MUST be trea
 
 Hook called after `validateUserOp` is called on the account by the entrypoint
 
-*The hook can revert to prevent the UserOperation from being validated.*
+The hook can revert to prevent the UserOperation from being validated.
 
 
 ```solidity
@@ -45,7 +48,7 @@ function afterValidateUserOp(
 
 Hook called after verifying a signature over a digest in an EIP-1271 callback.
 
-*MUST revert to signal that validation should fail*
+MUST revert to signal that validation should fail
 
 
 ```solidity
@@ -73,7 +76,7 @@ function afterIsValidSignature(bytes32 keyHash, bytes32 digest, bytes calldata h
 
 Hook called after verifying a signature over `SignedBatchedCall`.
 
-*MUST revert to signal that validation should fail*
+MUST revert to signal that validation should fail
 
 
 ```solidity

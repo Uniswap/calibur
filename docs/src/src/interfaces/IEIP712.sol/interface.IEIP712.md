@@ -1,5 +1,8 @@
 # IEIP712
-[Git Source](https://github.com/Uniswap/minimal-delegation/blob/8189d62a80ed3ac2bd308849641dca52350f024a/src/interfaces/IEIP712.sol)
+[Git Source](https://github.com/Uniswap/calibur/blob/249cac5e880831d7b2de4111a5920dbf0d242846/src/interfaces/IEIP712.sol)
+
+**Title:**
+IEIP712
 
 
 ## Functions
@@ -7,7 +10,7 @@
 
 Encode the EIP-5267 domain into bytes
 
-*for use in ERC-7739*
+for use in ERC-7739
 
 
 ```solidity
@@ -46,20 +49,14 @@ function hashTypedData(bytes32 hash) external view returns (bytes32);
 
 ### updateSalt
 
-Update the EIP-712 domain salt by setting the upper 96 bits to `prefix`
+Increment the EIP-712 domain salt prefix, the upper 96 bits of the salt
 12 bytes | 20 bytes
 prefix   | Implementation address (immutable, set on deployment)
 
-*Use this to invalidate existing signatures signed under the old domain separator*
+Use this to invalidate existing signatures signed under the old domain separator.
 
 
 ```solidity
-function updateSalt(uint96 prefix) external;
+function updateSalt() external;
 ```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`prefix`|`uint96`|The prefix to set|
-
 

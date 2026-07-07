@@ -16,17 +16,21 @@ forge test
 
 | Network | Address | Commit Hash | Version |
 |---------|---------|------------|---------|
-| Mainnet | 0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00 | 35d80918e120d177a49d3d90bcd4dd011caedd32 | v1.0.0 |
-| Unichain | 0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00 | 35d80918e120d177a49d3d90bcd4dd011caedd32 | v1.0.0 |
-| Base | 0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00 | 35d80918e120d177a49d3d90bcd4dd011caedd32 | v1.0.0 |
-| Optimism | 0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00 | 35d80918e120d177a49d3d90bcd4dd011caedd32 | v1.0.0 |
-| BNB | 0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00 | 35d80918e120d177a49d3d90bcd4dd011caedd32 | v1.0.0 |
-| Unichain Sepolia | 0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00 | 35d80918e120d177a49d3d90bcd4dd011caedd32 | v1.0.0 |
-| Sepolia | 0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00 | 35d80918e120d177a49d3d90bcd4dd011caedd32 | v1.0.0 |
+| Mainnet | 0x000000005c84F8Fd50b21CAC312528A64437030e | 249cac5e880831d7b2de4111a5920dbf0d242846 | v1.1.0 |
+| Unichain | 0x000000005c84F8Fd50b21CAC312528A64437030e | 249cac5e880831d7b2de4111a5920dbf0d242846 | v1.1.0 |
+| Base | 0x000000005c84F8Fd50b21CAC312528A64437030e | d7d   249cac5e880831d7b2de4111a5920dbf0d242846 | v1.1.0 |
+| Optimism | 0x000000005c84F8Fd50b21CAC312528A64437030e | 249cac5e880831d7b2de4111a5920dbf0d242846 | v1.1.0 |
+| BNB | 0x000000005c84F8Fd50b21CAC312528A64437030e | 249cac5e880831d7b2de4111a5920dbf0d242846 | v1.1.0 |
+| Arbitrum One | 0x000000005c84F8Fd50b21CAC312528A64437030e | 249cac5e880831d7b2de4111a5920dbf0d242846 | v1.1.0 |
+| Unichain Sepolia | 0x000000005c84F8Fd50b21CAC312528A64437030e | 249cac5e880831d7b2de4111a5920dbf0d242846 | v1.1.0 |
+| Sepolia | 0x000000005c84F8Fd50b21CAC312528A64437030e | 249cac5e880831d7b2de4111a5920dbf0d242846 | v1.1.0 |
 
 ## Audits
 - [OpenZeppelin Audit 05/2025](audits/OpenZeppelin_audit.pdf)
 - [Cantina Audit 04/2025](audits/Cantina_audit.pdf)
+
+## License
+MIT
 
 ## Disclaimer
 There are a few example hooks referenced in the repo. Be aware that these example hooks are not production code and may contain bugs. We do not recommend you to deploy these hooks or use them as reference implementations for productionized code. They are proof of concepts.
