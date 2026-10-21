@@ -16,7 +16,7 @@ forge test
 
 `CaliburEntry` is deployed with CREATE2 through the deterministic deployment proxy (`0x4e59b44847b379578588920cA78FbF26c0B4956C`), so each version has the same address on every chain listed below. Every row was checked onchain with `eth_getCode` against the Ethereum mainnet runtime bytecode.
 
-> **Note on EIP-712:** v1.1.0 still uses the EIP-712 domain version `"1.0.0"` (see `_domainNameAndVersion()` in `src/EIP712.sol`). Integrators should keep signing with `name = "Calibur"`, `version = "1.0.0"` for both v1.0.0 and v1.1.0 delegations. The two versions produce different domain separators through the `salt` field, which packs the implementation address (`verifyingContract` is the delegated account in both). Read the domain with `eip712Domain()` rather than hardcoding it. v1.1.0 also removes `multicall` (`IMulticall`), which v1.0.0 exposed.
+> **Note on EIP-712:** v1.1.0 still uses the EIP-712 domain version `"1.0.0"` (see `_domainNameAndVersion()` in `src/EIP712.sol`). Integrators should keep signing with `name = "Calibur"`, `version = "1.0.0"` for both v1.0.0 and v1.1.0 delegations. The two versions produce different domain separators through the `salt` field, which packs the implementation address (`verifyingContract` is the delegated account in both). Read the domain with `eip712Domain()` rather than hardcoding it. v1.1.0 also changes the ABI relative to v1.0.0: it removes `multicall(bytes[])` (`IMulticall`) and the transient native allowance functions `approveNativeTransient(address,uint256)`, `transferFromNativeTransient(address,address,uint256)` and `transientNativeAllowance(address)` (with their `ApproveNativeTransient` and `TransferFromNativeTransient` events); `updateSalt(uint96)` becomes `updateSalt()`; and it adds the `ERC20ETH()` getter and the errors `CannotRegisterKey`, `InvalidHook`, `InvalidKey`, `InvalidSettings` and `OnlyAdminCanCallEntryPoint`.
 
 ### v1.1.0 (latest)
 
@@ -57,9 +57,9 @@ forge test
 | X Layer | 196 | 0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00 | 35d80918e120d177a49d3d90bcd4dd011caedd32 | v1.0.0 |
 | World Chain | 480 | 0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00 | 35d80918e120d177a49d3d90bcd4dd011caedd32 | v1.0.0 |
 | Flow EVM | 747 | 0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00 | 35d80918e120d177a49d3d90bcd4dd011caedd32 | v1.0.0 |
-| Metis | 1088 | 0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00 | 35d80918e120d177a49d3d90bcd4dd011caedd32 | v1.0.0 |
+| Metis[^metis] | 1088 | 0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00 | 35d80918e120d177a49d3d90bcd4dd011caedd32 | v1.0.0 |
 | Sei | 1329 | 0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00 | 35d80918e120d177a49d3d90bcd4dd011caedd32 | v1.0.0 |
-| Story | 1514 | 0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00 | 35d80918e120d177a49d3d90bcd4dd011caedd32 | v1.0.0 |
+| DATA Network (formerly Story) | 1514 | 0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00 | 35d80918e120d177a49d3d90bcd4dd011caedd32 | v1.0.0 |
 | Abstract | 2741 | 0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00 | 35d80918e120d177a49d3d90bcd4dd011caedd32 | v1.0.0 |
 | Tempo | 4217 | 0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00 | 35d80918e120d177a49d3d90bcd4dd011caedd32 | v1.0.0 |
 | MegaETH | 4326 | 0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00 | 35d80918e120d177a49d3d90bcd4dd011caedd32 | v1.0.0 |
@@ -80,6 +80,8 @@ forge test
 | Arbitrum Sepolia | 421614 | 0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00 | 35d80918e120d177a49d3d90bcd4dd011caedd32 | v1.0.0 |
 | Sepolia | 11155111 | 0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00 | 35d80918e120d177a49d3d90bcd4dd011caedd32 | v1.0.0 |
 | OP Sepolia | 11155420 | 0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00 | 35d80918e120d177a49d3d90bcd4dd011caedd32 | v1.0.0 |
+
+[^metis]: Metis does not support the Cancun opcodes `TSTORE` and `MCOPY` (both revert there), so parts of v1.0.0 that rely on them, such as the transient native allowance functions, likely do not work on Metis.
 
 ## Audits
 - [OpenZeppelin Audit 05/2025](audits/OpenZeppelin_audit.pdf)
