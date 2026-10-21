@@ -6,6 +6,7 @@
 - [libraries](/src/libraries)
 - [BaseAuthorization](BaseAuthorization.sol/contract.BaseAuthorization.md)
 - [Calibur](Calibur.sol/contract.Calibur.md)
+- [CaliburEntry](CaliburEntry.sol/contract.CaliburEntry.md)
 - [EIP712](EIP712.sol/contract.EIP712.md)
 - [ERC1271](ERC1271.sol/abstract.ERC1271.md)
 - [ERC4337Account](ERC4337Account.sol/abstract.ERC4337Account.md)
@@ -14,5 +15,4 @@
 - [ERC7821](ERC7821.sol/abstract.ERC7821.md)
 - [ERC7914](ERC7914.sol/abstract.ERC7914.md)
 - [KeyManagement](KeyManagement.sol/abstract.KeyManagement.md)
-- [Multicall](Multicall.sol/abstract.Multicall.md)
 - [NonceManager](NonceManager.sol/abstract.NonceManager.md)

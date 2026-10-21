@@ -1,28 +1,31 @@
 # ERC1271
-[Git Source](https://github.com/Uniswap/minimal-delegation/blob/8189d62a80ed3ac2bd308849641dca52350f024a/src/ERC1271.sol)
+[Git Source](https://github.com/Uniswap/calibur/blob/249cac5e880831d7b2de4111a5920dbf0d242846/src/ERC1271.sol)
 
 **Inherits:**
 [IERC1271](/src/interfaces/IERC1271.sol/interface.IERC1271.md)
+
+**Title:**
+ERC-1271
 
 Abstract ERC1271 implementation which supports nested EIP-712 workflows as defined by ERC-7739
 
 
 ## State Variables
 ### _1271_MAGIC_VALUE
-*The magic value returned by `isValidSignature()` if the signature is valid.*
+The magic value returned by `isValidSignature()` if the signature is valid.
 
 
 ```solidity
-bytes4 internal constant _1271_MAGIC_VALUE = 0x1626ba7e;
+bytes4 internal constant _1271_MAGIC_VALUE = 0x1626ba7e
 ```
 
 
 ### _1271_INVALID_VALUE
-*The magic value returned by `isValidSignature()` if the signature is invalid.*
+The magic value returned by `isValidSignature()` if the signature is invalid.
 
 
 ```solidity
-bytes4 internal constant _1271_INVALID_VALUE = 0xffffffff;
+bytes4 internal constant _1271_INVALID_VALUE = 0xffffffff
 ```
 
 
@@ -31,10 +34,10 @@ bytes4 internal constant _1271_INVALID_VALUE = 0xffffffff;
 
 Validates the `signature` against the given `hash`.
 
-*Supports the following signature workflows:
+Supports the following signature workflows:
 - 64 or 65-byte ECDSA signatures from address(this)
 - Nested typed data signatures as defined by ERC-7739
-- Nested personal signatures as defined by ERC-7739*
+- Nested personal signatures as defined by ERC-7739
 
 
 ```solidity

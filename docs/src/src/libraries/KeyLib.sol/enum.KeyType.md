@@ -1,14 +1,14 @@
 # KeyType
-[Git Source](https://github.com/Uniswap/minimal-delegation/blob/8189d62a80ed3ac2bd308849641dca52350f024a/src/libraries/KeyLib.sol)
+[Git Source](https://github.com/Uniswap/calibur/blob/249cac5e880831d7b2de4111a5920dbf0d242846/src/libraries/KeyLib.sol)
 
-*The type of key.*
+The type of key.
 
 
 ```solidity
 enum KeyType {
-    P256,
-    WebAuthnP256,
-    Secp256k1
+P256,
+WebAuthnP256,
+Secp256k1
 }
 ```
 

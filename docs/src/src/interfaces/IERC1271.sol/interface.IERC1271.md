@@ -1,5 +1,8 @@
 # IERC1271
-[Git Source](https://github.com/Uniswap/minimal-delegation/blob/8189d62a80ed3ac2bd308849641dca52350f024a/src/interfaces/IERC1271.sol)
+[Git Source](https://github.com/Uniswap/calibur/blob/249cac5e880831d7b2de4111a5920dbf0d242846/src/interfaces/IERC1271.sol)
+
+**Title:**
+IERC1271
 
 
 ## Functions
@@ -7,17 +10,17 @@
 
 Validates the `signature` against the given `hash`.
 
-*Supports the following signature workflows:
+Supports the following signature workflows:
 - 64 or 65-byte ECDSA signatures from address(this)
 - Nested typed data signatures as defined by ERC-7739
-- Nested personal signatures as defined by ERC-7739*
+- Nested personal signatures as defined by ERC-7739
 
-*A wrappedSignature contains a keyHash, signature, and any optional hook data
-`signature` can contain extra fields used for webauthn verification or ERC7739 nested typed data verification*
+A wrappedSignature contains a keyHash, signature, and any optional hook data
+`signature` can contain extra fields used for webauthn verification or ERC7739 nested typed data verification
 
-*An unwrapped signature is only valid for the root key. However, the root key can also sign a 7739 rehashed signature.
+An unwrapped signature is only valid for the root key. However, the root key can also sign a 7739 rehashed signature.
 It is possible for an unwrapped signature from the root key to be replayed IF the root key is registered on another wallet, not this one, and that wallet
-does not enforce defensive rehashing for its keys. If this is a concern, use a 7739 wrapped signature for the root key.*
+does not enforce defensive rehashing for its keys. If this is a concern, use a 7739 wrapped signature for the root key.
 
 
 ```solidity

@@ -11,6 +11,5 @@
 - [IExecutionHook](IExecutionHook.sol/interface.IExecutionHook.md)
 - [IHook](IHook.sol/interface.IHook.md)
 - [IKeyManagement](IKeyManagement.sol/interface.IKeyManagement.md)
-- [IMulticall](IMulticall.sol/interface.IMulticall.md)
 - [INonceManager](INonceManager.sol/interface.INonceManager.md)
 - [IValidationHook](IValidationHook.sol/interface.IValidationHook.md)

@@ -1,8 +1,8 @@
 # Settings
-[Git Source](https://github.com/Uniswap/minimal-delegation/blob/8189d62a80ed3ac2bd308849641dca52350f024a/src/libraries/SettingsLib.sol)
+[Git Source](https://github.com/Uniswap/calibur/blob/249cac5e880831d7b2de4111a5920dbf0d242846/src/libraries/SettingsLib.sol)
 
 
 ```solidity
-type Settings is uint256;
+type Settings is uint256
 ```
 
